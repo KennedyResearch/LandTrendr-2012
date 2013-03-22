@@ -1,0 +1,567 @@
+
+
+;run_params = {ignore: 0, $  ;make sure the background value is the same for all images (mask out if necessary)
+;;        subset_size: 1000, $  ;keep between 500 and 1000 unless compelling reason to change
+;        subset_coordinates:subset_coordinates, $
+;;        min_correlation:min_correlation, $
+;        screen_prob: 0.02, $
+;        waterthresh:waterthresh, $
+;        cloudthresh:cloudthresh, $
+;        fix_only_these: [2009221], $    ;set to -1 to run all or [1992233, 2001212] to run only the julian-day 233 image in 1992 and the 212 julian day image in 2001
+;        dist_screen: 0.075 $  ;this value is used to eliminate gobs of pixels off-diagonal in the scaterplot of input and reference images
+;                    ;  INcrease the number if it seems the scatterplots are getting too truncated.
+;         }
+
+function madcal_for_tbcd_auto, image_info, run_params, output_csv_file, $
+    norm_method, useareafile=useareafile, apply_to_entire_image=apply_to_entire_image, $
+    min_nochange_count=min_nochange_count, eightbit=eightbit, pcaonthefly=pcaonthefly
+  
+  rootdirpath = run_params.path
+    
+  ref_index = where(image_info.type eq 3, refcount)
+  if norm_method eq 2 then begin
+    if refcount eq 0 then begin
+      print, 'The image to be used for the MADCAL reference '
+      print, 'was not found in the image info structure. '
+      print, 'Make sure that find_tbcd_files is used to find'
+      print, 'files, and that the reference image is an MTBS file'
+      print, 'that has been converted to COST and ends in _cost_refl.img'
+      return, {ok:-1}
+    endif else begin
+      refimgfile = image_info[ref_index].image_file
+      refcloudfile = image_info[ref_index].cloud_file
+      refyear = image_info[ref_index].year    ;for file output name  '_to_'
+      refday = image_info[ref_index].julday  ;for file output name  '_to_'
+    endelse
+  endif
+  if norm_method eq 3 then begin
+    ;find the radref image in the madcal folder
+    refimgfile = file_search(rootdirpath+"madcal\", "*radref.bsq", count=n_refimgfile)
+    if n_refimgfile ne 1 then message, "!!!there is no ledaps reference file!!!" else refimgfile = refimgfile
+    refcloudfile = file_search(rootdirpath+"madcal\", "*cloudmask.bsq", count=n_refcloudfile)
+    if n_refcloudfile ne 1 then message, "!!!there is no ledaps reference cloudmask file!!!" else refcloudfile = refcloudfile
+    refyear = strmid(file_basename(refimgfile),10,4)
+    refday = strmid(file_basename(refimgfile),15,3)
+  endif else begin
+    refimgfile = ""
+    refcloudfile = ""
+    refyear = "modis"
+    refday = ""
+  endelse
+  
+  
+  
+  ignore = run_params.ignore
+  ;  subset_size:run_params.subset_size, $
+  ;  coordinates:run_params.subset_coordinates}
+  
+  original_image_info = image_info
+  if run_params.fix_only_these[0] ne 0 then begin
+    ;the fix_only_these is a vector with the years to fix
+    n_fixes = n_elements(run_params.fix_only_these)
+    ;fix_indices = lonarr(n_fixes)
+    pointer = 0
+    
+    for fi = 0, n_fixes-1 do begin
+      ;check to see about the julian day.
+      if run_params.fix_only_these[fi] gt 3000 then begin ;if only the year
+        this_year = floor(run_params.fix_only_these[fi]/1000. )
+        this_julday = run_params.fix_only_these[fi]-(long(this_year)*1000)
+        match= where(image_info.year eq this_year and $
+          image_info.julday eq this_julday, n_matches)
+      endif else begin  ;if user only gave year
+        this_year = run_params.fix_only_these[fi]
+        this_julday = -1
+        match = where(image_info.year eq run_params.fix_only_these[fi], n_matches)
+      endelse
+      
+      if n_matches eq 0 then message, 'MADCAL_for_TBCD:  Cannot fix this year because not in image list'+string( run_params.fix_only_these[fi])
+      
+      if fi eq 0 then fix_indices = lonarr(n_matches) else expand_cols, fix_indices, n_matches, outdims
+      
+      for th = 0, n_matches-1 do begin    ;number of images in this year that match
+        fix_indices[pointer+th] = match[th]
+        ;now need to revert to the source image being the original, just in case
+        ;we're re-running madcal and there is an existing one in there.
+        imgfile = original_image_info[match[th]].image_file
+        s=strlen(imgfile)
+        check = (strpos(imgfile, '_to_') ne -1)
+        sep = path_sep()
+        if check then begin
+          path = get_pathname(image_info[match[th]].image_file)
+          length =strlen(path)
+          slash = strpos(path, sep, length, /reverse_search)  ;start at 1, in case there's on at the end that would confuse things
+          
+          ;go through each type looking for a clue.
+          
+          mtbs_file = file_search(path, '*refl.img')
+          n_mtbs_files = n_elements(mtbs_file)-total(mtbs_file eq "")
+          if n_mtbs_files ne 0 then begin
+            for i = 0, n_mtbs_files-1 do begin
+              juldayoffset = 12
+              julday_tentative = fix(strmid(mtbs_file[i],slash+juldayoffset, 3))
+              ;compare with the julian day passed by the user, if one was passed
+              if this_julday ne -1 then tester = this_julday else tester=julday_tentative
+              
+              if julday_tentative eq tester and $
+                julday_tentative eq image_info[match[th]].julday then begin
+                original_image_info[match[th]].image_file = mtbs_file[i]
+                goto, getout
+              endif
+            endfor
+          endif
+          
+          nlaps_file= file_search(path, '*nlaps.img')
+          n_nlaps_files = n_elements(nlaps_file)-total(nlaps_file eq "")
+          if n_nlaps_files ne 0 then begin
+            for i = 0, n_nlaps_files-1 do begin
+              juldayoffset = 14
+              julday_tentative = fix(strmid(nlaps_file[i],slash+juldayoffset, 3))
+              ;compare with the julian day passed by the user, if one was passed
+              if this_julday ne -1 then tester = this_julday else tester=julday_tentative
+              if julday_tentative eq tester and $
+                julday_tentative eq image_info[match[th]].julday then begin
+                original_image_info[match[th]].image_file = nlaps_file[i]
+                goto, getout
+              endif
+            endfor
+          endif
+          
+          other_file= file_search(path, '*6band.img')  ;these are images either purchased or inherited and then rectified
+          n_other_files = n_elements(other_file)-total(other_file eq "")
+          if n_other_files ne 0 then begin
+            for i = 0, n_other_files-1 do begin
+              juldayoffset = 14
+              julday_tentative = fix(strmid(other_file[i],slash+juldayoffset, 3))
+              ;compare with the julian day passed by the user, if one was passed
+              if this_julday ne -1 then tester = this_julday else tester=julday_tentative
+              if julday_tentative eq tester and $
+                julday_tentative eq image_info[match[th]].julday then begin
+                original_image_info[match[th]].image_file = other_file[i]
+                goto, getout
+              endif
+            endfor
+          endif
+          
+          archv_file= file_search(path, '*archv.bsq')  ;these are images either purchased or inherited and then rectified
+          n_archv_files = n_elements(archv_file)-total(archv_file eq "")
+          if n_archv_files ne 0 then begin
+            for i = 0, n_archv_files-1 do begin
+              juldayoffset = 16
+              julday_tentative = fix(strmid(archv_file[i],slash+juldayoffset, 3))
+              ;compare with the julian day passed by the user, if one was passed
+              if this_julday ne -1 then tester = this_julday else tester=julday_tentative
+              if julday_tentative eq tester and $
+                julday_tentative eq image_info[match[th]].julday then begin
+                original_image_info[match[th]].image_file = archv_file[i]
+                goto, getout
+              endif
+            endfor
+          endif
+          
+          print, 'no match found'
+          stop
+          
+          getout:  ;found it, now get out
+        endif ;check
+      endfor ;number of images in this year that match
+      pointer = pointer + n_matches
+    endfor ;n_fixes
+    image_info = original_image_info[fix_indices]
+  endif else begin
+    thegoods = where(strpos(image_info.image_file, "_to_") eq -1) ;run_params.fix_only_these[0] ne -1 then begin
+    image_info = image_info[thegoods]
+  endelse
+  
+  base = {reffile:refimgfile, $
+    refmask:refcloudfile, $
+    depfile:'', $
+    depmask:'',$
+    ignore:run_params.ignore, $
+    run_name:''}
+    
+  n_all_files = n_elements(image_info)
+  madcal_control_info = replicate(base, n_all_files)
+  ;set up summary structure
+  thisbase= {depfile:'', year:0U, doy:0U, mean_correlation:0.0,$
+    successful_run:0, num_subsets:0, $
+    b1_slope:0., b1_int:0. , b1_corr:0., $
+    b2_slope:0., b2_int:0. , b2_corr:0., $
+    b3_slope:0., b3_int:0. , b3_corr:0., $
+    b4_slope:0., b4_int:0. , b4_corr:0., $
+    b5_slope:0., b5_int:0. , b5_corr:0., $
+    b6_slope:0., b6_int:0. , b6_corr:0. , $
+    notes:'', time:0., mean_n_nochng:0U, link:"" }
+    
+  output_summaries = replicate(thisbase, n_all_files)
+  
+  
+  ;---------make a pca image--------------------------------------------------------------
+  ;check for a radiometric distribution image
+  if keyword_set(pcaonthefly) ne 1 then begin
+    pcomp1img = file_search(rootdirpath+"madcal\", "*pcomp1.bsq", count=n_pcomp1img)
+    if n_pcomp1img eq 0 then begin
+      print, ""
+      print, ">>> a radiometric distribution image does not exist"
+      if refcount eq 1 then begin
+        print, ""
+        print, ">>> a landsat reference image exists..."
+        print, ">>> would you like to use this image..."
+        print, ">>> as the radiometric distribution image too..."
+        print, ""
+        print, ">>> YES (press y), NO (press n) STOP, (press s)
+        g = get_kbrd()
+        if g eq "s" then stop
+        if g eq "y" then begin
+          imgforpca = refimgfile
+          cldmskforpca = refcloudfile
+        endif
+        if g eq "n" then begin
+          print, ""
+          print, ">>> okay, then lets find an image to use..."
+          print, ">>> starting image selector..."
+          print, ">>> please wait............................"
+          imgforpca = ls_madcal_ref_selector(rootdirpath, /from_auto, /check_ref)
+          matchthis = strcompress(strmid(file_basename(imgforpca),0,18)+"*cloudmask.bsq", /rem)
+          cldmskforpca = file_search(rootdirpath+"images\", matchthis, count=n_cldmskforpca)
+          if n_cldmskforpca eq 1 then cldmskforpca=cldmskforpca else message, "can't find corresponding cloudmask"
+        endif
+        print, ""
+        print, ">>> running pca on radiometric distribution image
+        layers = [1,4,6]
+        pcaimg = pca(imgforpca, layers, cldmskforpca)
+      endif else begin ;refcount eq 1
+        imgforpca = ls_madcal_ref_selector(rootdirpath, /from_auto, /check_ref)
+        matchthis = strcompress(strmid(file_basename(imgforpca),0,18)+"*cloudmask.bsq", /rem)
+        cldmskforpca = file_search(rootdirpath+"images\", matchthis, count=n_cldmskforpca)
+        if n_cldmskforpca eq 1 then cldmskforpca=cldmskforpca else message, "can't find corresponding cloudmask"
+        print, ""
+        print, ">>> running pca on radiometric distribution image
+        layers = [1,4,6]
+        pcaimg = pca(imgforpca, layers, cldmskforpca)
+      endelse ;refcount eq 1
+      
+    endif else begin ;if a radiometric distribution image exists do this...
+      print, ""
+      print, ">>> a principle component radiometric distribution image..."
+      print, ">>> already exists..."
+      print, ""
+      print, ">>> do you want to create a new one?"
+      print, ">>> YES (press y), NO (press n) STOP, (press s)
+      a = get_kbrd()
+      if a eq "s" then stop
+      if a eq "y" then begin
+        print, ""
+        print, ">>> do you want to overwrite the old one?"
+        print, ">>> YES (press y), NO (press n) STOP, (press s)
+        b = get_kbrd()
+        if b eq "y" then begin
+          close, /all
+          wilcofiles = file_search(rootdirpath+"madcal\", "*pcomp1*", count=n_wilcofiles)
+          if n_wilcofiles ge 1 then file_delete, wilcofiles else message, "could not find files to delete"
+        endif
+        if b eq "s" then stop
+        if refcount eq 0 then begin  ;if there is NOT a radiometric reference image
+          ;find a good date to use
+          imgforpca = ls_madcal_ref_selector(rootdirpath, /from_auto, /check_ref)
+          matchthis = strcompress(strmid(file_basename(imgforpca),0,18)+"*cloudmask.bsq", /rem)
+          cldmskforpca = file_search(rootdirpath+"images\", matchthis, count=n_cldmskforpca)
+          if n_cldmskforpca eq 1 then cldmskforpca=cldmskforpca else message, "can't find corresponding cloudmask"
+        endif else begin ;if there is a landsat radiometric reference image do this
+          print, ""
+          print, ">>> a landsat reference image exists..."
+          print, ">>> would you like to use this image..."
+          print, ">>> as the radiometric distribution image too..."
+          print, ""
+          print, ">>> YES (press y), NO (press n) STOP, (press s)
+          h = get_kbrd()
+          if h eq "s" then stop
+          if h eq "n" then begin
+            print, ""
+            print, ">>> okay, then lets find an image to use..."
+            print, ">>> starting image selector..."
+            print, ">>> please wait............................"
+            print, ""
+            imgforpca = ls_madcal_ref_selector(rootdirpath, /from_auto, /check_ref)
+            matchthis = strcompress(strmid(file_basename(imgforpca),0,18)+"*cloudmask.bsq", /rem)
+            cldmskforpca = file_search(rootdirpath+"images\", matchthis, count=n_cldmskforpca)
+            if n_cldmskforpca eq 1 then cldmskforpca=cldmskforpca else message, "can't find corresponding cloudmask"
+          endif else begin
+            imgforpca = refimgfile
+            cldmskforpca = refcloudfile
+          endelse
+        endelse
+        print, ""
+        print, ">>> running pca on radiometric distribution image
+        layers = [1,4,6]
+        pcaimg = pca(imgforpca, layers, cldmskforpca)
+      endif ;if create a new radiometric distribution image
+    endelse ;if a radiometric distribution image exists
+  endif
+  
+  ;********************************************************************************************************************************
+  
+  ;Now go through and run it on all of the files
+  for run = 0, n_all_files - 1 do begin
+    t1 = systime(1)
+    
+    if norm_method eq 1 then begin
+      ;find the modis image
+      refimgfile = file_search(rootdirpath+"madcal\", "*modis_reference.bsq", count=n_refimgfile)
+      if n_refimgfile ne 1 then message, "!!!there is no modis reference file!!!" else refimgfile = refimgfile
+      refcloudfile = image_info[run].cloud_file
+      ;change the info in the madcal_control_info structure for the reference files
+      madcal_control_info[run].reffile = refimgfile
+      madcal_control_info[run].refmask = image_info[run].cloud_file
+    endif
+    
+    if norm_method eq 3 then begin
+      ;change the info in the madcal_control_info structure for the reference files
+      madcal_control_info[run].reffile = refimgfile
+      madcal_control_info[run].refmask = refcloudfile
+    endif
+    
+    output_summaries[run].depfile = image_info[run].image_file
+    print, ">>> normalizing: ",output_summaries[run].depfile
+    
+    ;move on if this is the radref img
+    if image_info[run].type eq 3 then goto, skip
+    ;move on if this is file does not have a cloudmask
+    if image_info[run].cloud_file eq "none" then begin
+      print, "  >>> this image does not have a cloudmask, skipping...
+      goto, skip1
+    endif
+    matchit = strmatch(image_info[run].image_file, "*_to_*")
+    if strmatch(image_info[run].image_file, "*_to_*") eq 1 then begin
+      print, "  >>> this image has already been normalized..."
+      print, "  >>> if you would like to redo it..."
+      print, "  >>> then you must enter the year and julian day..."
+      print, "  >>> in the batchfile variable: 'fix_only_these'..."
+      print, "  >>> under the run_madcal section of the..."
+      print, "  >>> dynamic variable inputs and make sure you are either..."
+      print, "  >>> processing procedure group 2 or that you are..."
+      print, "  >>> running the 'run_madcal' procedure in manaul mode"
+      goto, skip1
+    endif
+    notes = ''    ;keeps track of the key issues, if any
+    
+    madcal_control_info.depfile = image_info[run].image_file
+    madcal_control_info.depmask = image_info[run].cloud_file
+    if norm_method eq 3 then madcal_control_info.run_name = strcompress('_to_ledaps_'+string(refyear[0])+"_"+string(refday[0]), /rem) $
+    else madcal_control_info.run_name = strcompress('_to_'+string(refyear)+"_"+ $
+    string(refday), /rem)
+    
+  ;    madcal_control_info.run_name = strcompress(string(image_info[run].year)+$
+  ;      string(image_info[run].julday) + $
+  ;      '_to_'+string(original_image_info[ref_index].year), /rem)
+    
+  ;set up the file to keep track of all output from this run
+  results_path = get_pathname(madcal_control_info[run].depfile)
+  filename = get_filename(madcal_control_info[run].depfile)
+  writefile = strmid(filename, 0, strlen(filename)-4)+madcal_control_info[run].run_name+'_madcaloutputs.txt'
+  
+  if n_elements(useareafile) eq 0 then footprint = madcal_control_info[run].reffile else $
+    footprint = useareafile
+    
+  ;---make file name for normalized output image---
+  ncf = madcal_control_info[run].depfile
+  time = string(bin_date(systime()), format='(I4,I02,I02,"_",I02,I02,I02)')
+  output_base = strcompress(strmid(ncf, 0, strlen(ncf)-26)+"_"+time+madcal_control_info[run].run_name, /rem)
+  
+  ;check for and delete dates that have already been normalized (delete "_to_" and it's TC img)
+  output_check = strcompress(output_base+".bsq", /rem)
+  lt_delete_duplicate, output_check, /radnorm, /tcimg
+  
+  nochange_mask = output_base+'_nochangepixels.bsq'
+  ;nochange_mask = results_path+'radcal_'+madcal_control_info[run].run_name+'_nochangepixels.bsq' ;old jdb 9/26/11
+  
+  this_run_info = {file1:madcal_control_info[run].reffile, $
+    file2:madcal_control_info[run].depfile, $
+    file1mask:madcal_control_info[run].refmask, $
+    file2mask:madcal_control_info[run].depmask, $
+    ; usearea:madcal_control_info[run].usearea,$ ;the below footprint is the usearea file
+    run_name:madcal_control_info[run].run_name, $
+    results_path:results_path, $
+    ignore:madcal_control_info[run].ignore, $
+    footprint:footprint,$
+    nochange:nochange_mask}
+    
+  ;---find no change pixels--- 
+  if norm_method eq 1 then modis_ref = 1
+  madcal_pixel_picker, rootdirpath, this_run_info, image_info, param_set=param_set, modis_ref=modis_ref,$
+    pcaonthefly=pcaonthefly
+    
+  ;---pack up some inputs for regress---
+  nochange_info = {nochange_file:nochange_mask,$
+    fname1:this_run_info.file1,$
+    fname2:this_run_info.file2}
+  use_dist_screen = run_params.dist_screen
+  use_screen_prob = run_params.screen_prob
+  
+  ;---do the regression on the no-change pixels for the ref and dep image
+  print, "starting regression..."
+  ok2 = regress_from_nochange_dist_auto(nochange_info, output_base, ignore=ignore,$
+    screen_prob = use_screen_prob, apply_to_entire_image=apply_to_entire_image, $
+    dist_screen = use_dist_screen, madcal_control_info[run].depmask, eightbit=eightbit)
+
+  ;create a single tif of the 6 bands and their regression
+  dir = file_dirname(nochange_info.fname2)
+  title = file_basename(nochange_info.fname2)
+  tifs = file_search(dir, "*.tif")
+  ;    if n_elements(tifs) ne 6 then  ;NEED TO FINISH THIS
+  
+  if n_elements(tifs) eq 8 then begin
+    img1 = read_image(tifs[0]) ;this is the 3band img
+    img2 = read_image(tifs[1])
+    img3 = read_image(tifs[2])
+    img4 = read_image(tifs[3])
+    img5 = read_image(tifs[4])
+    img6 = read_image(tifs[5])
+    img7 = read_image(tifs[6])
+    img8 = read_image(tifs[7])
+    
+    !P.MULTI=[0,4,2]
+    window, xsize=1200, ysize=700, title=title, 7 ;create a window to hold all of the regression tifs
+    loadct,0 ;load a color table
+    TVImage,reverse(img1,3),true=1 ;display the images in the window
+    TVImage,reverse(img2,3),true=1
+    TVImage,reverse(img3,3),true=1
+    TVImage,reverse(img4,3),true=1
+    TVImage,reverse(img5,3),true=1
+    TVImage,reverse(img6,3),true=1
+    TVImage,reverse(img7,3),true=1
+    TVImage,reverse(img8,3),true=1
+    
+    aaa = tvrd(/true) ;get the window as a variable
+    
+    ;create filename for combined plots
+    filename = file_basename(tifs[0])
+    len = strlen(filename)-9 ;was 7    -9/8/2011
+    filename = strcompress(strmid(filename,0, len)+"_regression.tif")
+    dirlen = strlen(dir)
+    madcal_folder = strcompress(strmid(dir,0,dirlen-11)+"madcal\" , /rem)
+    ;delete pervious versions
+    
+    searchthis = strcompress(string(image_info[run].year)+ $
+      "_"+string(image_info[run].julday)+"*.tif", /rem)
+    oldsummary = file_search(madcal_folder, searchthis, count=n_oldsummary)
+    if n_oldsummary ge 1 then file_delete, oldsummary, /allow_nonexistent, /quiet
+    
+    output_tiff = strcompress(madcal_folder+string(image_info[run].year)+ $
+      "_"+string(image_info[run].julday)+"_"+filename, /rem)
+    ;output_tiff = strcompress(madcal_folder+filename, /rem) ;old jdb 9/26/11
+      
+    ;write it out
+    write_tiff, output_tiff, reverse(aaa,3) ;write out the combined tiffs
+  endif
+  
+  ;delete the individual files
+  file_delete, tifs, /quiet
+  
+  ;fill in the output summaries
+  output_summaries[run].depfile = nochange_info.fname2
+  output_summaries[run].year = image_info[run].year
+  output_summaries[run].doy = image_info[run].julday
+  output_summaries[run].mean_correlation = mean(ok2.band_stats.corr)
+  ;    output_summaries[run].num_subsets = nochange_info.num_subsets
+  output_summaries[run].successful_run = 1  ;if we got here, it ran
+  output_summaries[run].b1_slope = ok2.band_stats[0].slope
+  output_summaries[run].b1_int = ok2.band_stats[0].intercept
+  output_summaries[run].b1_corr = ok2.band_stats[0].corr
+  
+  output_summaries[run].b2_slope = ok2.band_stats[1].slope
+  output_summaries[run].b2_int = ok2.band_stats[1].intercept
+  output_summaries[run].b2_corr = ok2.band_stats[1].corr
+  
+  output_summaries[run].b3_slope = ok2.band_stats[2].slope
+  output_summaries[run].b3_int = ok2.band_stats[2].intercept
+  output_summaries[run].b3_corr = ok2.band_stats[2].corr
+  if n_elements(ok2.band_stats) gt 3 then begin
+    output_summaries[run].b4_slope = ok2.band_stats[3].slope
+    output_summaries[run].b4_int = ok2.band_stats[3].intercept
+    output_summaries[run].b4_corr = ok2.band_stats[3].corr
+  end
+  if n_elements(ok2.band_stats) gt 4 then begin
+    output_summaries[run].b5_slope = ok2.band_stats[4].slope
+    output_summaries[run].b5_int = ok2.band_stats[4].intercept
+    output_summaries[run].b5_corr = ok2.band_stats[4].corr
+  end
+  if n_elements(ok2.band_stats) gt 5 then begin
+    output_summaries[run].b6_slope = ok2.band_stats[5].slope
+    output_summaries[run].b6_int = ok2.band_stats[5].intercept
+    output_summaries[run].b6_corr = ok2.band_stats[5].corr
+  end
+  
+  ;image_info[run].image_file =  ok2.calibrated_image
+  output_summaries[run].notes = notes
+  output_summaries[run].mean_n_nochng = round(mean(ok2.band_stats.n_nochng))
+  output_summaries[run].link = output_tiff
+  
+  ;create the metadata structure
+  thisrunsummary = output_summaries[run]
+  meta = make_metadata_for_preprocessing(ok2.calibrated_image, madcal_summary=thisrunsummary, norm_method=norm_method)
+  metaout = stringswap(ok2.calibrated_image, ".bsq", "_meta.txt")
+  concatenate_metadata, madcal_control_info[run].depfile, metaout, params=meta
+  
+  skip: ;if image_info[run].type eq 3 (refimg)
+  t2 = systime(1)
+  time = float((t2-t1)/60)
+  output_summaries[run].time = time
+  
+  ;---write out the summary as both a csv and .sav---
+  if image_info[run].type eq 3 then begin
+    output_summaries[run].year = image_info[run].year
+    output_summaries[run].doy = image_info[run].julday
+  endif
+  
+  ;create name for .sav file, .csv is already defined
+  result_file_base = strcompress(file_dirname(output_csv_file)+"\", /rem)
+  norm_summary_savefile = strcompress(result_file_base+file_basename(output_csv_file, ".csv")+".sav", /rem)
+  search_string = strcompress("*"+strmid(file_basename(output_summaries[run].depfile),0,18)+"*", /rem)
+  
+  ;find out if the .sav file exists
+  exists = file_exists(norm_summary_savefile)
+  if exists eq 1 then begin
+    restore, norm_summary_savefile
+    ;see if the current image is new to the .sav summary file
+    duplicate = where(strmatch(norm_info.depfile, search_string) eq 1, dupcount)
+    ;newone = where(file_basename(norm_info.depfile) ne search_string, newcount)
+    if dupcount ge 1 then begin ;deal with duplicates
+      norm_info[duplicate] = output_summaries[run]
+      save, norm_info, filename =norm_summary_savefile ;save the structure
+    endif else begin
+      norm_info = [norm_info,output_summaries[run]]
+      dones = where(norm_info.year ne 0)
+      norm_info = norm_info[dones]
+      save, norm_info, filename =norm_summary_savefile ;save the structure
+    endelse
+  endif else begin ;do this if the norm_info .savfile does not exist
+    ;save the summary info structure as a .sav file
+    dones = where(output_summaries.depfile ne '')
+    norm_info = output_summaries[dones]
+    save, norm_info, filename =norm_summary_savefile ;save the structure
+  endelse
+  
+  restore, norm_summary_savefile
+  wilco = where(norm_info.year eq 0, n_wilco)
+  if n_wilco ge 1 then begin
+    wilco = where(norm_info.year ne 0)
+    norm_info = norm_info[wilco]
+    save, norm_info, filename =norm_summary_savefile ;save the structure
+  endif
+  
+  export_structure_to_file, norm_info, output_csv_file ;export the structure to a .csv
+  print, "time: ", time," minutes"
+  ;skip: ;skips the reference image and images that do not have a cloudmask
+  skip1:
+endfor ;loop for images
+
+
+;save the summary info structure as a .sav file
+norm_info = output_summaries
+save, norm_info, filename =image_info_savefile;save the structure
+export_structure_to_file, norm_info, output_csv_file ;export the structure to a .csv
+
+return, {ok:1, image_info:image_info, output_summaries:output_summaries}
+end
+

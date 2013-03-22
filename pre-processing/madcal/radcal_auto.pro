@@ -1,0 +1,139 @@
+pro radcal_auto, refimg_file, depimg_file, check_pixels, info, subset, nochange, nochangecount, modis_ref=modis_ref
+
+  ;---read in the images and look for no-change pixels---
+  ;---get some info---
+  zot_img, depimg_file, dephdr, depimg, /hdronly
+  n_layers = dephdr.n_layers ;number of bands
+  n_check_pix = n_elements(check_pixels)
+  ;create a holder for the depimg check pixels
+  ;pixel type
+  ;0="u1"
+  ;1="u2"
+  ;2="u4"
+  ;3="u8"
+  ;4="s8"
+  ;5="u16"
+  ;6="s16"
+  ;7="u32"
+  ;8="s32"
+  ;9="f32"
+  ;10="f64"
+  ;11="c64"
+  ;12="c128"
+  case dephdr.pixeltype of
+    3: tempimage2=bytarr(n_layers,n_check_pix)
+    5: tempimage2=uintarr(n_layers,n_check_pix)
+    6: tempimage2=intarr(n_layers,n_check_pix)
+    7: tempimage2=ulonarr(n_layers,n_check_pix)
+    8: tempimage2=lonarr(n_layers,n_check_pix)
+    9: tempimage2=fltarr(n_layers,n_check_pix)  
+  endcase
+  
+  ;create a holder for the refimg check pixels
+  zot_img, refimg_file, refhdr, refimg, /hdronly  
+  case refhdr.pixeltype of
+    3: tempimage1=bytarr(n_layers,n_check_pix)
+    5: tempimage1=uintarr(n_layers,n_check_pix)
+    6: tempimage1=intarr(n_layers,n_check_pix)
+    7: tempimage1=ulonarr(n_layers,n_check_pix)
+    8: tempimage1=lonarr(n_layers,n_check_pix)
+    9: tempimage1=fltarr(n_layers,n_check_pix)  
+  endcase 
+   
+  ;create holders for means
+  m1s=fltarr(n_layers) ; means of reference image holder
+  m2s=fltarr(n_layers) ; means of target image holder
+  
+  ;go through each band and fill in the tempimages
+  print, "  rearranging and subsetting the ref and dep images"
+  for i=0,n_layers-1 do begin
+    print, "    band: ", i+1
+    ;load the reference image
+    ;Landsat to MODIS band correspondence (from Yang 9/14/11)
+    ;Landsat, MODIS, sequence in the LT stack
+    ;1, 3, 1
+    ;2, 4, 2
+    ;3, 1, 3
+    ;4, 2, 4
+    ;5, 6, 5
+    ;7, 7, 6
+    if keyword_set(modis_ref) eq 1 then begin
+      if i eq 0 then layer = 3
+      if i eq 1 then layer = 4
+      if i eq 2 then layer = 1
+      if i eq 3 then layer = 2
+      if i eq 4 then layer = 6
+      if i eq 5 then layer = 7
+    endif else layer = i+1
+    
+    master_subset = subset
+    subset = master_subset
+    zot_img, refimg_file, refhdr, refimg, subset=subset, layers=layer
+    
+    ;pull out the check pixels
+    ;tempimage1[i,*] = reform(refimg, 1)
+    tempimage1[i,*] = refimg[check_pixels]
+    
+    ;load the dependent image
+    subset = master_subset
+    zot_img, depimg_file, dephdr, depimg, subset=subset, layers=i+1
+    ;pull out the check pixels
+    ;tempimage1[i,*] = reform(refimg, 1)
+    tempimage2[i,*] = depimg[check_pixels]
+  endfor
+  
+  image1=fltarr(n_layers,n_check_pix) ;make a holder for refimg stuff
+  image2=fltarr(n_layers,n_check_pix) ;make a holder for depimg stuff
+  ;image3=fltarr(n_layers,n_check_pix)
+  
+  ;go through each band and get the deviation from mean
+  for i = 0, n_layers-1 do begin
+    image1[i,*] = tempimage1[i,*] ;fill in the refimg holder
+    m1s[i] = mean(image1[i,*]) ;get the mean of the check pixels for refimg
+    image1[i,*]=image1[i,*]-m1s[i] ;get the deviation from the mean for refimg
+    
+    image2[i,*] = tempimage2[i,*] ;fill in the depimg holder
+    m2s[i] = mean(image2[i,*]) ;get the mean of the check pixels for depimg
+    image2[i,*]=image2[i,*]-m2s[i] ;get the deviation from the mean for depimg
+  endfor
+  tempimage1=0 ;save memory
+  tempimage2=0 ;save memory
+  
+  ;prepare the deviation from mean pixels to be evaluated for no-change
+  print, "checking for no-change pixels"
+  samples = transpose([[transpose(image1)],[transpose(image2)]])
+  
+  sigma = correlate(samples,/covariance,/double);,/double)
+  
+  sigma_xx = sigma[0:n_layers-1,0:n_layers-1]
+  sigma_yy = sigma[n_layers:2*n_layers-1,n_layers:2*n_layers-1]
+  sigma_xy = sigma[n_layers:2*n_layers-1,0:n_layers-1]
+  sigma_yx = sigma[0:n_layers-1,n_layers:2*n_layers-1]
+  
+  C1 = sigma_xy ## invert(sigma_yy,/double) ## sigma_yx ;sigma_xy ## invert(sigma_yy) ## sigma_yx ;
+  B1 = sigma_xx
+  C2 = sigma_yx ## invert(sigma_xx,/double) ## sigma_xy ;sigma_yx ## invert(sigma_xx) ## sigma_xy ;
+  B2 = sigma_yy
+  
+  gen_eigenproblem, C1, B1, A, lambda ; C1 a = lambda B1 a
+  gen_eigenproblem, C2, B2, B, lambda ; C2 b = lambda B2 b
+  
+  sigMADs = sqrt(2*(1-sqrt(lambda)))
+  
+  ;ensure positive correlation
+  for i=0,n_layers-1 do $
+    if (transpose(A[i,*])##sigma_xy##B[i,*] lt 0) $
+    then B[i,*] = -B[i,*]
+    
+  MADs = image1##A-image2##B
+  
+  ;get mask for no-change pixels
+  print, "pulling out the no-change pixels"
+  for i=0,n_layers-1 do MADs[i,*]=MADs[i,*]/sigMADs[i]
+  threshold = chisqr_cvf(0.995,n_layers)
+  
+  ;check whether there is any no change pixels
+  nochange = where(sqrt(total(MADs*MADs,1)) lt threshold, nochangecount)
+  return
+end
+

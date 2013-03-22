@@ -1,0 +1,3 @@
+function timestamp
+  return, string(bin_date(systime()), format='(I4,I02,I02,"_",I02,I02,I02)')
+end

@@ -1,0 +1,818 @@
+
+pro landtrendr_preprocessor, run_params
+
+  ;---unpack the structure---
+  ppprrr=run_params.ppprrr
+  path=run_params.path
+  vct_convert_glovis=run_params.vct_convert_glovis
+  prep_dem=run_params.prep_dem
+  input_dem=run_params.input_dem
+  prep_nlcd=run_params.prep_nlcd
+  nlcdimg=run_params.nlcdimg
+  run_vct_for_masks=run_params.run_vct_for_masks
+  lt_convert_glovis=run_params.lt_convert_glovis
+  water_off=run_params.water_off
+  snow_off=run_params.snow_off
+  delete_files=run_params.delete_files
+  proj_ref_file=run_params.proj_ref_file
+  vct_to_lt_masks=run_params.vct_to_lt_masks
+  create_ref_image=run_params.create_ref_image
+  make_image_info=run_params.make_image_info
+  run_madcal=run_params.run_madcal
+  dark_object_vals=run_params.dark_object_vals
+  ls_madcal_ref_img=run_params.ls_madcal_ref_img
+  create_tc=run_params.create_tc
+  fix_cloudmasks=run_params.fix_cloudmasks
+  fix_hdrs=run_params.fix_hdrs
+  print_img_info=run_params.print_img_info
+  repop_img_info=run_params.repop_img_info
+  create_ts_img_list=run_params.create_ts_img_list
+  convert_hdrs=run_params.convert_hdrs
+  make_composites=run_params.make_composites
+  fix_only_these=run_params.fix_only_these
+  preprocessing_mode=run_params.preprocessing_mode
+  madcal_ref_img=run_params.madcal_ref_img
+  delete_lt_dates=run_params.delete_lt_dates
+  deletedate=run_params.deletedate
+  norm_method=run_params.norm_method
+  trgtday=run_params.target_day
+  trgtyear=run_params.target_year
+  modis_img_path=run_params.modis_img_path
+  ;is_update=run_params.is_update
+  segmentation_eval=run_params.segmentation_eval
+  segparamstxt=run_params.segparamstxt
+  segmentation=run_params.segmentation
+  resume=run_params.resume
+  label_segs=run_params.label_segs
+  filter_labels=run_params.filter_labels
+  screen_images=run_params.screen_images
+  label_parameters_txt=run_params.label_parameters_txt
+  class_code_txt=run_params.class_code_txt
+  run_ftv_doit=run_params.fit_to_vertices
+  add_years_to_hdr=run_params.add_years_to_hdr
+  radiometric_ref_img=run_params.radiometric_ref_img
+  dist_rec_snapshots=run_params.dist_rec_snapshots
+  dark_seg_outputs=run_params.dark_seg_outputs
+  
+
+  ;check that the batcfile was saved prior to running
+  print, ""
+  print, ">>> beginning preprocessing..."
+  print, ""
+  print, ">>> make sure that you've saved any edits you made to the batchfile..."
+  print, ""
+  print, ">>> is there an asterisk next to the file name of the batchfile tab in the..."
+  print, ">>> idl editor window?
+  print, ""
+  print, ">>> NO (press 1), YES (press 2)"
+  saved = get_kbrd()
+  if saved eq '2' then begin
+    print, ""
+    print, ">>> okay, batchfile was not saved..."
+    print, ">>> save the batchfile and rerun"
+    print, ""
+    print, ">>> stopping program"
+    print, ""
+    stop
+  endif
+  
+  ;check the passed path and make sure it is an actual path
+  if file_test(path) ne 1 then begin
+    print, ">>>"
+    print, ">>> WARNING!!!"
+    print, ">>> the path given in this scenes batchfile variable..."
+    print, ">>> 'path' apparently does not exist..."
+    print, "*********************************************************"
+    print, ">>> path: ", path
+    print, "*********************************************************"
+    print, ">>> make sure this is correct and change the..."
+    print, ">>> 'path' variable in the batchfile if not"
+    print, ""
+    return
+  endif
+  
+  ;check to see if this is an update - look into the update folder and see if there are glovis tar.gz files in there
+  dummy = file_search(path+"glovis_targz\update", "*tar.gz*", count=isupdate)
+  if isupdate ge 1 then update=1 else update=0
+  is_update = update ;lazy
+  
+  if is_update eq 1 then begin
+    repeat begin
+      print, ">>>"
+      print, ">>> Are you sure you want to run in update mode?"
+      print, ">>> NO (press 1), YES (press 2)"
+      a = get_kbrd()
+      if a eq 1 then begin
+        print, ">>> change the 'is_update' variable and rerun"
+        return
+      endif
+    endrep until a eq 1 or a eq 2
+  endif
+  
+  
+  for h=0, n_elements(procedures) do begin
+    case preprocessing_mode of
+      1: dothis = " process procedure group 1?"
+      2: dothis = " process procedure group 2?"
+      3: dothis = " process procedure group 3?"
+      4: dothis = " process procedure group 4?"
+      5: dothis = " process procedure group 5?"
+      5: dothis = " process procedure group 6?"
+      7: dothis = " run in manual mode?"
+    endcase
+    repeat begin
+      print, ">>>"
+      print, ">>> Are you sure you want to",dothis
+      print, ">>> NO (press 1), YES (press 2)"
+      a = get_kbrd()
+      if a eq 1 then begin
+        print, ">>> change the preprocessing mode and rerun"
+        return
+      endif
+    endrep until a eq 1 or a eq 2
+  endfor
+  
+  case preprocessing_mode of
+    1: doit = [1,1,1,1,1,1,1  ,0  ,0,0  ,0,0  ,0  ,0,0,0,0,0,0  ,0,0,0,0,0,0,0,0] ;PROCESS GROUP 1
+    2: doit = [0,0,0,0,0,0,0  ,1  ,0,0  ,0,0  ,0  ,0,0,0,0,0,0  ,0,0,0,0,0,0,0,0] ;PROCESS GROUP 2
+    3: doit = [0,0,0,0,0,0,0  ,0  ,1,1  ,0,0  ,0  ,0,0,0,0,0,0  ,0,0,0,0,0,0,0,0] ;PROCESS GROUP 3
+    4: doit = [0,0,0,0,0,0,0  ,0  ,0,0  ,1,1  ,0  ,0,0,0,0,0,0  ,0,0,0,0,0,0,0,0] ;PROCESS GROUP 4
+    5: doit = [0,0,0,0,0,0,0  ,0  ,0,0  ,0,0  ,1  ,0,0,0,0,0,0  ,0,0,0,0,0,0,0,0] ;PROCESS GROUP 5
+    6: doit = [0,0,0,0,0,0,0  ,0  ,0,0  ,0,0  ,0  ,1,1,1,1,1,1  ,0,0,0,0,0,0,0,0] ;PROCESS GROUP 6
+    7: goto, doitmanual
+  endcase
+  ;-----------PROCESS GROUP 1-----------
+  vct_convert_glovis  = doit[0]  ;unpackage glovis files for use in VCT
+  screen_images       = doit[1]
+  prep_dem            = doit[2]  ;!prepare a DEM for use in VCT
+  prep_nlcd           = doit[3]  ;!prepare a landcover map for use in VCT
+  run_vct_for_masks   = doit[4]  ;have VCT make a landcover mask
+  lt_convert_glovis   = doit[5]  ;!unpackage glovis files for use in LandTrendr
+  vct_to_lt_masks     = doit[6]  ;!convert the VCT landcover mask to LandTrendr "cloudmasks"
+  ;-----------PROCESS GROUP 2-----------
+  create_ref_image    = doit[7]  ;!create either a COST ref img or a from MODIS ref img
+  ;-----------PROCESS GROUP 3-----------
+  fix_cloudmasks      = doit[8]  ;!create cloudmask if VCT did not make one and fix specific cloudmasks as needed (need to define the date below)
+  run_madcal          = doit[9]  ;!normalized all images to a radiometric reference image
+  ;-----------PROCESS GROUP 4-----------
+  create_ts_img_list  = doit[10]  ;creates TimeSync image lists
+  create_tc           = doit[11]  ;creates tasseled cap transformations from the normalized images
+  ;-----------PROCESS GROUP 5-----------
+  segmentation_eval   = doit[12] ;runs landtrendr in evaluation mode
+  ;-----------PROCESS GROUP 6-----------
+  segmentation        = doit[13]  ;creates segmentation outputs
+  fit_to_vertices     = doit[14]  ;use 1 to run bgw, 2 to run b5,b4,b3, 3 to run both
+  label_segs          = doit[15]  ;extracts specific segment types
+  filter_labels       = doit[16]  ;applys mmu spatial filtering and performs patch aggregation on labeled outputs
+  dist_rec_snapshots  = doit[17]  ;create disturbance and recovery slice outputs
+  dark_seg_outputs    = doit[18]  ;creates an output used to make a forest-nonforest mask
+  ;-----------MISC----------------------
+  make_image_info     = doit[19]  ;!create an image info file
+  make_composites     = doit[20]  ;creates yearly image composites from normalized images
+  fix_hdrs            = doit[21]  ;fixes hdr's that reference the upperleft corner of a pixel (1.0) instead of the center (1.5)
+  repop_img_info      = doit[22]  ;0=do nothing, 1=repopulate all fields 2=do not repop normalized imgs 3=repop only cloudmasks
+  print_img_info      = doit[23]  ;0=do nothing, 1=print image file, 2=print cloudmask, 3=print tc file, 4=print usearea file or [1,3,4] or [1,4]
+  convert_hdrs        = doit[24]  ;converts "flat" headers to envi style headers; 1=convert headers (no overwrite), 2=convert headers (overwrite)
+  delete_lt_dates     = doit[25]  ;!deletes every instance of a given date (define the date below)
+  add_years_to_hdr    = doit[26]  ;adds the year of the bands to the fitted output headers (.hdr)
+  ;-------------------------------------
+  
+  ;ask about the manual selection
+  doitmanual: ;start here is processing_mode is 7 (manual)
+  if preprocessing_mode eq 7 then begin
+    print, ""
+    print, ">>> You have choosen to run in the manual mode..."
+    print, ">>> Are you sure you want to run the following..."
+    print, ""
+    print, "****************************************"
+    if vct_convert_glovis eq 1 then print, "    -vct_convert_glovis"
+    if screen_images eq 1 then print, "    -screen_images"
+    if prep_dem eq 1 then print, "    -prep_dem"
+    if prep_nlcd eq 1 then print, "    -prep_nlcd"
+    if run_vct_for_masks eq 1 then print, "    -run_vct_for_masks"
+    if lt_convert_glovis eq 1 then print, "    -lt_convert_glovis"
+    if vct_to_lt_masks eq 1 then print, "    -vct_to_lt_masks"
+    if create_ref_image eq 1 then print, "    -create_ref_image"
+    if keyword_set(fix_cloudmasks) eq 1 then print, "    -fix_cloudmasks"
+    if run_madcal eq 1 then print, "    -run_madcal"
+    if create_tc eq 1 then print, "    -create_tc"
+    if segmentation_eval eq 1 then print, "    -segmentation_eval"
+    if segmentation eq 1 then print, "    -segmentation"
+    if keyword_set(run_ftv_doit) eq 1 then print, "    -fit_to_vertices"
+    if label_segs eq 1 then print, "    -label_segs"
+    if filter_labels eq 1 then print, "    -filter_labels"
+    if dist_rec_snapshots eq 1 then print, "    -dist_rec_snapshots"
+    if dark_seg_outputs eq 1 then print, "    -dark_seg_outputs" 
+    if make_image_info eq 1 then print, "    -make_image_info"
+    if create_ts_img_list eq 1 then print, "    -create_ts_img_list"
+    if make_composites eq 1 then print, "    -make_composites"
+    if fix_hdrs eq 1 then print, "    -fix_hdrs"
+    if repop_img_info eq 1 or repop_img_info eq 2 or repop_img_info eq 3 then print, "    -repop_img_info"
+    if print_img_info[0] eq 1 or print_img_info[0] eq 2 or print_img_info[0] eq 3 or print_img_info[0] eq 4 then print, "    -print_img_info"
+    if convert_hdrs eq 1 or convert_hdrs eq 2 then print, "    -convert_hdrs"
+    if delete_lt_dates eq 1 then print, "    -delete_lt_dates"
+    if add_years_to_hdr eq 1 then print, "    -add_years_to_hdr"
+    print, "****************************************"
+    print, ""
+    print, ">>> NO (press 1), YES (press 2)"
+    a = get_kbrd()
+    repeat begin
+      print, ""
+      if a eq 1 then begin
+        print, ">>> change the preprocessing selection and rerun"
+        print, ""
+        print, ""
+        return
+      endif
+    endrep until a eq 1 or a eq 2
+  endif  ;if preprocessing_mode eq 4
+  
+  if convert_hdrs eq 2 then overwrite_hdr = 1 else overwrite_hdr = 0
+  if keyword_set(vct_to_lt_masks) eq 1 then convert_hdrs = 1
+  if keyword_set(create_ref_image) eq 1 then convert_hdrs = 1
+  if keyword_set(fix_cloudmasks) eq 1 then convert_hdrs = 1
+  if keyword_set(run_madcal) eq 1 then convert_hdrs = 1
+  if keyword_set(create_tc) eq 1 then convert_hdrs = 1
+  if keyword_set(make_composites) eq 1 then convert_hdrs = 1
+  if keyword_set(segmentation_eval) eq 1 then convert_hdrs = 1
+  if keyword_set(segmentation) eq 1 then convert_hdrs = 1
+  if keyword_set(dist_rec_snapshots) eq 1 then convert_hdrs = 1
+  if keyword_set(is_update) eq 1 then begin
+    create_ref_image = 0
+    prep_dem = 0
+    prep_nlcd = 0
+  endif
+  
+  eval = 0 ;set the default value of evaluation segmentation to 0
+  if keyword_set(segmentation_eval) eq 1 then begin
+    eval=1
+    segmentation = 1
+    label_segs = 1
+  endif
+  
+  addyears = segmentation_eval + segmentation + run_ftv_doit + add_years_to_hdr
+  
+  ;###################################################################################################
+  ;THESE KEYWORD VARIABLES ARE HARDWIRED!!!
+  singles = 1  ;hardwire to run vct on single images instead of full image list
+  pcaonthefly= 1  ;hardwire to have the radiometric distibution file created on the fly
+  file_cleanup= 1 ;hardwire to have the program delete all of the intermiedate zipped files from the .tar.gz glovis images (retains the .tar.gz file)
+  ;###################################################################################################
+  
+  update = is_update
+  image_info_savefile = path+'images\landtrendr_image_info_'+ppprrr+'.sav'
+  templatehdr = file_search(path+'study_area\', "*headerfile*", count=count)
+  if file_test(templatehdr) eq 0 or count ne 1 then begin
+    print, ">>> could not find a template header file..."
+    print, ">>> or more than one exists..."
+    print, ">>> a single template header file must exist
+    print, ">>> in the scene's study_area folder..."
+    print, ">>> it must also have the word 'headerfile' somewhere in the file name"
+    stop
+  endif
+  
+  ;check fixes to make sure they are in the image info
+  if keyword_set(fix_only_these) ne 0 then begin
+    create_ref_image = 0
+    create_image_info, path,image_info_savefile
+    repopulate_image_info,image_info_savefile
+    restore, image_info_savefile
+    nofix = 0
+    for i=0, n_elements(fix_only_these)-1 do begin
+      fixit = strtrim(string(fix_only_these[i]),2)
+      year = fix(strmid(fixit,0,4))
+      day = fix(strmid(fixit,4,3))
+      match = where(image_info.year eq year and image_info.julday eq day, n_match)
+      if n_match eq 0 then begin
+        print, ">>>"
+        print, ">>> warning!!! you have requested to fix...
+        print, ">>> the cloudmask for year-julian day:"
+        print, ">>>"
+        print, ">>>  year: ", year, "  day: ", day
+        print, ">>>"
+        print, ">>> but this date does not exist in the image_info..."
+        print, ">>> as a valid image date in this scenes series..."
+        print, ">>> check to make sure that this is the correct date"
+        print, ">>>"
+        nofix = 1
+      endif
+    endfor
+    if nofix eq 1 then begin
+      print, ">>> fix the dates in the batchfile variable...
+      print, ">>> 'fix_only_these' and then rerun the batchfile"
+      print, ">>> ending program."
+      print, ""
+    endif
+  endif
+  
+  
+  ;---go through each step requested---
+  ;#################################################################################################################
+  ;---convert the glovis downloads to vct-ready images
+  if keyword_set(vct_convert_glovis)eq 1 then begin
+    t1 = systime(1)
+    delete_duplicate_targz, path, ppprrr
+    vct_convertgeotiff2envi, path, ppprrr, update=update
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> vct_convert_glovis took: ", time," minutes"
+    print, ""
+  endif
+  
+  ;#################################################################################################################
+  if keyword_set(screen_images) eq 1 then begin   ;and keyword_set(vct_convert_glovis)eq 1
+    t1 = systime(1)
+    check_mtl_header, path, ppprrr, update=update
+    ;create_321_rgb_quick_looks, path, ppprrr, update=update
+    create_321_rgb_quick_looks1, path, ppprrr, update=update
+    screenimg_gui_testing, path, ppprrr
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> screen_images: ", time," minutes"
+    print, ""
+  endif
+  
+  ;#################################################################################################################
+  ;---prepare the vct dem---
+  if keyword_set(prep_dem) eq 1 then begin
+    t1 = systime(1)
+    prep_dem_for_vct, path, ppprrr, proj_ref_file, input_dem=input_dem
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> prep_dem took: ", time," minutes"
+    print, ""
+  endif
+  
+  ;#################################################################################################################
+  ;---prepare the vct nlcd map---
+  if keyword_set(prep_nlcd) eq 1 then begin
+    t1 = systime(1)
+    prep_nlcd_for_vct, path, ppprrr, nlcdimg
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> prep_nlcd took: ", time," minutes"
+    print, ""
+  endif
+  
+  ;#################################################################################################################
+  ;---run vct to get vct bad cover masks---
+  if keyword_set(run_vct_for_masks) eq 1 then begin
+    t1 = systime(1)
+    vct_img_list_splitter, path, ppprrr, update=update, singles=singles, delete_files=delete_files
+    vct_mask_combiner, path, ppprrr, update=update
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> run_vct_for_masks took: ", time," minutes"
+    print, ""
+  endif
+  
+  ;#################################################################################################################
+  ;---convert the glovis downloads into landtrendr archv images---
+  ;---create a file_mgmt.sav file---
+  make_file_mgmt_savefile, path
+  
+  ;#################################################################################################################
+  ;---convert the glovis downloads into landtrendr archv images---
+  if keyword_set(lt_convert_glovis) eq 1 then begin
+    t1 = systime(1)
+    envi_glovis_to_landtrendr, path, proj_ref_file, overwrite=overwrite,$
+      skipthermal=skipthermal, pixelSize=pixelSize, update=update, file_cleanup=file_cleanup
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> lt_convert_glovis took: ", time," minutes"
+    print, ""
+  endif
+  
+  ;#################################################################################################################
+  ;---convert the vct masks to madcal and landtrendr masks---
+  if keyword_set(vct_to_lt_masks) eq 1 then begin
+    t1 = systime(1)
+    create_lt_masks_from_vct_masks, path, ppprrr, proj, templatehdr, outpath=outpath,$
+      water_off=water_off, snow_off=snow_off  ;, update=update
+    ;watersnow_mask_for_madcal, path, ppprrr  ;, update=update
+    create_landcover_mask_for_madcal, path, ppprrr, templatehdr
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    make_cloudmask_quickview, path, cloudfile=cloudfile
+    print, ">>> vct_to_lt_masks took: ", time," minutes"
+  endif
+  
+  ;#################################################################################################################
+  ; ;---fix hdrs that reference the ul of ul cell instead of center  1.0000 vs 1.5000---
+  if keyword_set(fix_hdrs) eq 1 then begin
+    t1 = systime(1)
+    from_envi_hdr_fixer, path
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> fix_hdrs took: ", time," minutes"
+  endif
+  
+  ;#################################################################################################################
+  ;---create a radiometric reference image---
+  if keyword_set(create_ref_image) eq 1 then begin
+    if madcal_ref_img eq 1 then begin
+      from_auto = {dark_object_vals:dark_object_vals, ls_madcal_ref_img:ls_madcal_ref_img}
+      cost, path, from_auto=from_auto, /check_ref
+    endif
+    if madcal_ref_img eq 2 then begin
+      ;find the use area for following procedures - assumes that vct_to_lt_masks has been run
+      studyarea_dir = path+"study_area\"
+      useareafile = file_search(path+"study_area\", "*vct_usearea.bsq", count=vusecount)
+      if vusecount eq 0 then begin
+        print, ">>> trying to find a '*vct_usearea.bsq' file here:"
+        print, "  ", path+"study_area\"
+        print, ">>> but apparently it's not there, make sure..."
+        print, ">>> that the 'vct_to_lt_masks' procedure has been run"
+        stop
+      endif
+      if vusecount gt 1 then begin
+        print, ">>> trying to find a '*vct_usearea.bsq' file here:"
+        print, "  ", path+"study_area\"
+        print, ">>> but apparently there are more than 1...
+        print, ">>> it can't be this way, delete one"
+        stop
+      endif
+      
+      run_params = {screen_prob: 0.0, dist_screen:0.075, ignore: 0, fix_only_these:fix_only_these}
+      eightbit=0 ;have the outputs written as unsigned 8 bit use 0 for outputs as signed 16 bit
+      modis_madcal, path, ppprrr, run_params, useareafile, $ ;image_info_savefile,
+        modis_img_path, ls_madcal_ref_img=ls_madcal_ref_img, eightbit=eightbit,$
+        pcaonthefly=pcaonthefly, trgtday=trgtday, trgtyear=trgtyear
+    endif
+    if madcal_ref_img eq 3 then begin
+      run_params = {screen_prob: 0.0, dist_screen:0.075, ignore: 0, fix_only_these:fix_only_these}
+      eightbit=0 ;have the outputs written as unsigned 8 bit use 0 for outputs as signed 16 bit
+      generic_reference_madcal, path, ppprrr, run_params, useareafile, $ ;image_info_savefile,
+        radiometric_ref_img, ls_madcal_ref_img=ls_madcal_ref_img, eightbit=eightbit,$
+        pcaonthefly=pcaonthefly, trgtday=trgtday, trgtyear=trgtyear
+    endif
+    if madcal_ref_img eq 4 then begin
+      reproject_ledaps, path
+    endif
+  endif
+  
+  ;#################################################################################################################
+  ;---delete lt files---
+  if keyword_set(delete_lt_dates) eq 1 then begin
+    create_image_info, path,image_info_savefile
+    repopulate_image_info,image_info_savefile
+    delete_lt_files, path, ppprrr, deletedate
+    create_image_info, path,image_info_savefile
+    repopulate_image_info,image_info_savefile
+  endif
+  
+  ;#################################################################################################################
+  ;fix cloudmasks
+  if keyword_set(fix_cloudmasks) eq 1 then begin
+    create_image_info, path, image_info_savefile
+    repopulate_image_info,image_info_savefile, /ignore_norms
+    fix_cloud_masks3, image_info_savefile, fix_cloudmasks, fixmask=fix_only_these, from_madcal=from_madcal
+    ;if fix_cloudmasks eq 1 then fix_cloud_masks, path, ppprrr, image_info_savefile, fixmask=fix_only_these
+    ;if fix_cloudmasks eq 2 then fix_cloud_masks1, path, ppprrr, image_info_savefile, fixmask=fix_only_these
+    ;if fix_cloudmasks eq 3 then fix_cloud_masks2, path, ppprrr, image_info_savefile, fixmask=fix_only_these
+  endif
+  
+  ;#################################################################################################################
+  ;---create image info---
+  if keyword_set(make_image_info) eq 1 then begin
+    create_image_info, path,image_info_savefile
+    repopulate_image_info,image_info_savefile
+  endif
+  
+  ;#################################################################################################################
+  ;run madcal
+  if keyword_set(run_madcal) eq 1 then begin
+    create_image_info, path,image_info_savefile
+    repopulate_image_info,image_info_savefile, /ignore_norms
+    restore, image_info_savefile
+    run_params = {screen_prob: 0.0, dist_screen:0.075, ignore: 0, fix_only_these:fix_only_these, path:path}
+    output_csv_file = path+"madcal\"+ppprrr+"_madcal_results.csv"
+    useareafile = image_info[0].useareafile
+    eightbit=0 ;have the outputs written as unsigned 8 bit use 0 for outputs as signed 16 bit
+    t1 = systime(1)
+    ok = madcal_for_tbcd_auto(image_info, run_params, output_csv_file, norm_method, useareafile=useareafile, $
+      /apply_to_entire_image, eightbit=eightbit)
+    create_madcal_summary_pdf, path
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> run_madcal took: ", time," minutes"
+  endif
+  
+  ;#################################################################################################################
+  ;create tasseled cap transformations
+  if keyword_set(create_tc) eq 1 then begin
+    create_image_info, path,image_info_savefile
+    repopulate_image_info,image_info_savefile
+    restore, image_info_savefile
+    t1 = systime(1)
+    create_landtrendr_tc_stacks, image_info, fix_these=fix_only_these
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> create_tc took: ", time," minutes"
+  endif
+  
+  ;#################################################################################################################
+  ;create uncomposited image lists
+  if keyword_set(create_ts_img_list) eq 1 then begin
+    create_image_info, path,image_info_savefile
+    repopulate_image_info,image_info_savefile
+    make_ts_image_lists, image_info_savefile, path, ppprrr
+  endif
+  
+  ;#################################################################################################################
+  ;make composites
+  if keyword_set(make_composites) eq 1 then begin
+    create_image_info, path,image_info_savefile
+    restore, image_info_savefile
+    outputbase = strcompress(path+'\images\composites\lt_'+ppprrr, /rem)
+    refl_imglist_name = strcompress(path+"\timesync\"+ppprrr+"_composite_refl_list.txt", /rem)
+    tc_imglist_name = strcompress(path+"\timesync\"+ppprrr+"_composite_tc_list.txt", /rem)
+    file_mkdir, strcompress(path+"images\composites", /rem)
+    
+    ;---define output extent---
+    ;the following lines will automatically define the extent
+    ok = find_union_area(image_info_savefile, /checkmask)
+    if ok.ok ne 1 then stop
+    subset = ok.coords
+    
+    ;---run the function for refl---
+    print, 'Making refl composites'
+    ok=run_composition(image_info, subset, outputbase, tc=tc)
+    print, 'Done making refl composites'
+    
+    ;---make the refl composite image list---
+    img_list = outputbase+'_imglist.txt'
+    openr, lun, img_list, /get_lun
+    file_size = file_lines(img_list,/noexpand_path)
+    file_list = strarr(file_size)
+    readf, lun, file_list
+    free_lun, lun
+    
+    year = strmid(file_list [1:*],4,4)
+    day = strmid(file_list [1:*],10,3)
+    file = strmid(file_list [1:*],20)
+    header = ['PLATFORM,YEAR,JULDAY,LABEL,FILE']
+    
+    ts_img_list = [header, 'TM'+','+year+','+day+','+year+','+file]
+    
+    ;---write out the refl image list---
+    print, 'Reflectance list:'
+    print, ts_img_list
+    openw, lun,refl_imglist_name,/get_lun
+    printf, lun,ts_img_list
+    free_lun, lun
+    
+    ;---run the function for TC---
+    print, 'Making TC composites'
+    ok=run_composition(image_info, subset, outputbase, /tc)
+    print, 'Done making TC composites'
+    
+    ;---make the TC composite image list---
+    img_list = outputbase+'_imglist.txt'
+    openr, lun, img_list, /get_lun
+    file_size = file_lines(img_list,/noexpand_path)
+    file_list = strarr(file_size)
+    readf, lun, file_list
+    free_lun, lun
+    
+    year = strmid(file_list [1:*],4,4)
+    day = strmid(file_list [1:*],10,3)
+    file = strmid(file_list [1:*],20)
+    header = ['PLATFORM,YEAR,JULDAY,LABEL,FILE']
+    
+    ts_img_list = [header, 'TM'+','+year+','+day+','+year+','+file]
+    
+    ;---write out the tc image list---
+    print, 'TC list:'
+    print, ts_img_list
+    openw, lun,tc_imglist_name,/get_lun
+    printf, lun,ts_img_list
+    free_lun, lun
+    
+    print, 'Done making composite imagery'
+  endif
+  
+  ;#################################################################################################################
+  if keyword_set(repop_img_info) eq 1 then begin
+    if repop_img_info eq 2 then begin
+      ignore_norms = 1
+    endif
+    if repop_img_info eq 3 then begin
+      findmasksonly = 1
+    endif
+    repopulate_image_info,image_info_savefile, ignore_norms=ignore_norms
+  endif
+  
+  ;#################################################################################################################
+  if keyword_set(print_img_info) eq 1 then begin
+    restore, image_info_savefile
+    for i=0, n_elements(print_img_info)-1 do begin
+      if print_img_info[i] eq 1 then print, transpose(image_info.image_file)
+      if print_img_info[i] eq 2 then print, transpose(image_info.cloud_file)
+      if print_img_info[i] eq 3 then print, transpose(image_info.tc_file)
+      if print_img_info[i] eq 4 then print, transpose(image_info.useareafile)
+    endfor
+  endif
+  
+  ;#################################################################################################################
+  ;run_segmentation
+  if keyword_set(segmentation) eq 1 then begin
+    if file_exists(segparamstxt) eq 0 then begin
+      ;try to find the parameter file
+      segparamstxt = file_search(path, "*segmentation_parameters.txt")
+    endif
+    create_image_info, path,image_info_savefile
+    repopulate_image_info,image_info_savefile
+    ;make sure that all of the preprocessing is complete
+    check_image_info_prior_to_seg, image_info_savefile
+    
+    mask_image = file_search(path+"study_area\", "*usearea.bsq", count=n_mask_image)
+    if n_mask_image gt 1 then mask_image = mask_image[where(strmatch(mask_image, "*vct*") ne 1)]
+    params = parse_seg_params(path, ppprrr, segparamstxt, image_info_savefile, mask_image=mask_image, subset=subset, eval=eval, resume=resume)
+    
+    ;if this is the non-eval run - find the eval files and delete them
+    if keyword_set(eval) ne 1 then begin
+      eval_files = file_search(file_dirname(params[0].output_base), "*eval*", count=n_eval_files)
+      if n_eval_files ge 1 then file_delete, eval_files
+    endif
+    
+    if keyword_set(eval) eq 1 then n_runs = 1 else n_runs = n_elements(params)
+    
+    for i=0, n_runs-1 do begin
+      print, ">>> Starting Segmentation", i+1
+      t1 = systime(1)
+      ok= process_tbcd_chunks(params[i])
+      end_time = systime()
+      print, '>>> Done With Segmentation', i+1
+      t2 = systime(1)
+      time = float((t2-t1)/60)
+      print, ">>> segmentation ", i+1, " took: ", time," minutes"
+    endfor
+    convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+  endif
+  
+  ;#################################################################################################################
+  ;create ftv outputs
+  if keyword_set(run_ftv_doit) eq 1 then begin
+    print, ">>> Starting fit to vertices"
+    t1 = systime(1)
+    if run_ftv_doit eq 1 or run_ftv_doit eq 3 then tc_bgw = 1 else tc_bgw = 0
+    if run_ftv_doit eq 2 or run_ftv_doit eq 3 then b543 = 1 else b543 = 0
+    run_ftv, path, tc_bgw=tc_bgw, b543=b543
+    convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> fit to vertices took: ", time," minutes"
+  endif
+  
+  ;#################################################################################################################
+  ;add year to fitted outputs headers
+  if addyears ge 1 then begin
+    print, ">>> Starting add years to fitted outputs"
+    t1 = systime(1)
+    convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+    outputs_path = path+"outputs\"
+    diag_file = file_search(outputs_path, "*diag.sav", count=n_diag_file)
+    ;find the non ftvs
+    nonftv_index = where(strmatch(diag_file, "*ftv*") ne 1, n_nonftv_index, complement=ftv_index, ncomplement=n_ftv_index)
+    if n_nonftv_index ge 1 then begin
+      dothese = diag_file[nonftv_index]
+      for i=0, n_nonftv_index-1 do add_years_to_fittedimages, path, dothese[i]
+    endif
+    if n_ftv_index ge 1 then begin
+      dothese = diag_file[ftv_index]
+      for i=0, n_ftv_index-1 do add_years_to_fittedimages, path, dothese[i], /from_ftv
+    endif
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> add years to fitted outputs took: ", time," minutes"
+  endif
+  
+  ;#################################################################################################################
+  ;create labled outputs
+  if keyword_set(label_segs) eq 1 then begin
+    print, ">>> Starting segment labeling"
+    t1 = systime(1)
+    outputs_path = path+"outputs\"
+    diag_file = file_search(outputs_path, "*diag.sav", count=n_diag_file)
+    ;find the non ftvs
+    nonftv_index = where(strmatch(diag_file, "*ftv*") ne 1, n_nonftv_index, complement=ftv_index, ncomplement=n_ftv_index)
+    if n_nonftv_index ge 1 then begin
+      dothese = diag_file[nonftv_index]
+      for i=0, n_nonftv_index-1 do begin
+        label_params = parse_label_params(path, dothese[i], label_parameters_txt, class_code_txt, eval=eval)
+        checkit = label_existence_check(path, dothese[i], label_params)
+        if checkit.ok eq 0 then continue 
+        ok = lt_label(checkit.updated_label_params)
+      endfor
+    endif
+    convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> segment labeling took: ", time," minutes"
+  endif
+  
+  ;#################################################################################################################
+  ;filter labeled outputs
+  if keyword_set(filter_labels) eq 1 then begin
+    print, ">>> Starting patch aggregation and filtering"
+    t1 = systime(1)
+    run_label_class_filter, path, class_code_txt
+    convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+    t2 = systime(1)
+    time = float((t2-t1)/60)
+    print, ">>> patch aggregation and filtering took: ", time," minutes"
+  endif
+  
+  ;#################################################################################################################
+  ;create disturbance and recovery layers
+  if keyword_set(dist_rec_snapshots) eq 1 then begin
+    outputs_path = path+"outputs\"
+    diag_file = file_search(outputs_path, "*diag.sav", count=n_diag_file)
+    ;find the non ftvs
+    nonftv_index = where(strmatch(diag_file, "*ftv*") ne 1, n_nonftv_index, complement=ftv_index, ncomplement=n_ftv_index)
+    if n_nonftv_index ge 1 then begin
+      dothese = diag_file[nonftv_index]
+      for i=0, n_nonftv_index-1 do begin
+        t1 = systime(1)
+        ok = create_dist_rec_snapshots(dothese[i])
+        t2 = systime(1)
+        time = float((t2-t1)/60)
+        print, ">>> dist_rec_snapshot ", i+1, " took: ", time," minutes"
+      endfor
+      convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+    endif
+  endif
+  
+  ;#################################################################################################################
+  ;create dark seg outputs
+  if keyword_set(dark_seg_outputs) eq 1 then begin
+    outputs_path = path+"outputs\"
+    diag_file = file_search(outputs_path, "*diag.sav", count=n_diag_file)
+    ;find the non ftvs
+    nonftv_index = where(strmatch(diag_file, "*ftv*") ne 1, n_nonftv_index, complement=ftv_index, ncomplement=n_ftv_index)
+    if n_nonftv_index ge 1 then begin
+      dothese = diag_file[nonftv_index]
+      for i=0, n_nonftv_index-1 do begin
+        t1 = systime(1)
+        ok = make_forest_mask_input_image(dothese[i]) 
+        t2 = systime(1)
+        time = float((t2-t1)/60)
+        print, ">>> dark_seg_outputs ", i+1, " took: ", time," minutes"
+      endfor
+      convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+    endif
+  endif
+ 
+  ;#################################################################################################################
+  ;convert hdrs
+  if keyword_set(convert_hdrs) eq 1 then begin
+    if overwrite_hdr eq 1 and fix_hdrs eq 0 then from_envi_hdr_fixer, path
+    convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+  endif
+  
+  ;#################################################################################################################
+  ;print instructions for what to do next
+  if preprocessing_mode eq 1 then begin
+    print, ""
+    print, ">>> finished processing procedure group 1..."
+    print, ">>> before moving onto procedure group 2..."
+    print, ">>> pick a radiometric reference image date..."
+    print, ">>> this date should be near 2002, near julian day 211..."
+    print, ">>> and be mostly cloud-free without haze or smoke..."
+    print, ">>> enter the year and julian day into the
+    print, ">>> edit the 'preprocessing_mode' variable..."
+    print, ">>> in the batchfile to '2' to start procedure group 2"
+  endif
+  if preprocessing_mode eq 2 then begin
+    print, ""
+    print, ">>> finished processing procedure group 2..."
+    print, ">>> check the results of the reference image creation..."
+    print, ">>> by opening the madcal folder and checking..."
+    print, ">>> the coverage of the cloudmask, and the regression fits..."
+    print, ">>> if not satified with the cloudmask or the regression fits..."
+    print, ">>> then try running again and increasing the coverage of the cloudmask..."
+    print, ">>> if still not satisfied, try a different date as the reference image"
+  endif
+  if preprocessing_mode eq 3 then begin
+    print, ""
+    print, ">>> finished processing procedure group 3..."
+    print, ">>> evaluate the madcal results in the..."
+    print, ">>> tif files in the scene's 'madcal' folder..."
+    print, ">>> noting any cloudmask that do not cover..."
+    print, ">>> all clouds or smoke and haze or any..."
+    print, ">>> regression fits that are biased by..."
+    print, ">>> groups of pixels that are off the trend."
+    print, ">>> once you've gone through all of the tifs..."
+    print, ">>> and noted the year and julian day of the bads one..."
+    print, ">>> then type the year and date into the..."
+    print, ">>> 'fix_only_these' variables in..."
+    print, ">>> in the batchfile.  repeat processing..."
+    print, ">>> procedure group 3 until all the dates are OK..."
+    print, ">>> then process procedure group 4 by changing..."
+    print, ">>> the 'preprocessing_mode' variable in the..."
+    print, ">>> this scene's batchfile to '4' by"
+    print, ">>> editing the preprocessing_mode variable..."
+    print, ">>> in the batchfile to '4' to start procedure group 4"
+  endif
+end
