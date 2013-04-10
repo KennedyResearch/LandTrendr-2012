@@ -1,4 +1,4 @@
-function parse_seg_params, path, ppprrr, segparamstxt, image_info_savefile, mask_image=mask_image, subset=subset, eval=eval, resume=resume
+function parse_seg_params, path, ppprrr, segparamstxt, image_info_savefile, mask_image=mask_image, subset=subset, eval=eval, resume=resume, forcenew=forcenew
 
   restore, image_info_savefile
   
@@ -36,6 +36,7 @@ function parse_seg_params, path, ppprrr, segparamstxt, image_info_savefile, mask
     mask_image: '' ,$
     subset: [[0.0D,0.0D],[0.0D,0.0D]] ,$
     output_base: '',$
+    output_path: "", $	;added REK march 28 2013
     image_info:image_info}
     
   firsttime = 1 ;set first time to true
@@ -151,7 +152,10 @@ function parse_seg_params, path, ppprrr, segparamstxt, image_info_savefile, mask
       lrx[i] ne 'na' and lry[i] ne 'na' then theruns[i].subset = double([[ulx[i],uly[i]],[lrx[i],lry[i]]])
       
     ;initial base name creation
+    base_outputpath = path+"outputs"+pse+theruns[i].index+pse ;added REK march 28
+    theruns[i].output_path = base_outputpath	;added REK march 28
     outbase = path+"outputs"+pse+theruns[i].index+pse+"LT_"+landtrendr_version()+"_"+theruns[i].index+"_"+ppprrr+"_"
+    
     
     ;check to see if an eval output set exists for this scene already
    
@@ -183,12 +187,21 @@ if keyword_set(eval) eq 1 then begin
         theruns[i].output_base = outbase+name+timestamp()
       end 
     endif else begin 
-      theruns[i].output_base = outbase+theruns[i].run_name+timestamp()
-      if keyword_set(resume) eq 1 then begin
-        previous_file = file_search(file_dirname(outbase), '*'+theruns[i].run_name+'*_diag.sav', count=pn)
-        ;assume only one set for each parameter set
-        if pn gt 0 then theruns[i].output_base = stringswap(previous_file[0], "_diag.sav", "")
-      endif
+      ;changing the logic here so that it will assume we're resuming a run, and have to be forced to 
+      ;generate a new timestamp. 
+        
+	;first see if there is one there with this run name already
+	
+	previous_file = file_search(file_dirname(outbase), '*'+theruns[i].run_name+'*_diag.sav', count=pn)
+        if pn gt 1 then previous_file = previous_file[pn-1]	;set to latest one if multiples
+	
+	;then either use that previous one, or generate a new one.  If "force_new", then 
+	;   generate a new one regardless
+	
+	 if (pn ge 0) and (keyword_set(force_new) eq 0) then $
+	 	theruns[i].output_base = stringswap(previous_file, "_diag.sav", "") else $
+		theruns[i].output_base = outbase+theruns[i].run_name+timestamp()
+	
     endelse
   endfor
   

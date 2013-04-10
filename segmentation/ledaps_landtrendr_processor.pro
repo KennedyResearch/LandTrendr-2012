@@ -57,34 +57,39 @@ pro ledaps_landtrendr_processor, run_params
   
   ;#################################################################################################################
   ;run_segmentation
+  ;first, get the path we will be using for this run -- for all subsequent steps too. 
+  
+    if image_list ne 0 then adj_img_info, image_list, image_list_type, image_info_savefile
+    params = parse_seg_params(path, ppprrr, segparamstxt, image_info_savefile, mask_image=useareafile, subset=subset, eval=eval, resume=resume)
+    thispath = params.output_path
+  
   if segmentation eq 1 then begin
     if file_exists(segparamstxt) eq 0 then begin
       ;try to find the parameter file
       segparamstxt = file_search(path, "*segmentation_parameters.txt")
     endif
     ;make sure that all of the preprocessing is complete
-    if image_list ne 0 then adj_img_info, image_list, image_list_type, image_info_savefile
-    params = parse_seg_params(path, ppprrr, segparamstxt, image_info_savefile, mask_image=useareafile, subset=subset, eval=eval, resume=resume)
     
     ;if this is the non-eval run - find the eval files and delete them
     if keyword_set(eval) ne 1 then begin
       eval_files = file_search(file_dirname(params[0].output_base), "*eval*", count=n_eval_files)
       if n_eval_files ge 1 then file_delete, eval_files
     endif
+  
+  ;march27 2013.  taking out reference to multiple runs -- the model is to do one run all the way through  
+  ;  if keyword_set(eval) eq 1 then n_runs = 1 else n_runs = n_elements(params)
     
-    if keyword_set(eval) eq 1 then n_runs = 1 else n_runs = n_elements(params)
-    
-    for i=0, n_runs-1 do begin
-      print, ">>> Starting Segmentation", i+1
+  ;  for i=0, n_runs-1 do begin
+      print, ">>> Starting Segmentation";, i+1
       t1 = systime(1)
 
-      ok= process_tbcd_chunks(params[i], progressbaryesno)
+      ok= process_tbcd_chunks(params, progressbaryesno)
       end_time = systime()
-      print, '>>> Done With Segmentation', i+1
+      print, '>>> Done With Segmentation';, i+1
       t2 = systime(1)
       time = float((t2-t1)/60)
-      print, ">>> segmentation ", i+1, " took: ", time," minutes"
-    endfor
+      print, ">>> segmentation took: ", time," minutes"
+   ; endfor
     convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
   endif
   
@@ -96,15 +101,16 @@ pro ledaps_landtrendr_processor, run_params
     if run_ftv_doit eq 1 or run_ftv_doit eq 3 then tc_bgw = 1 else tc_bgw = 0
     if run_ftv_doit eq 2 or run_ftv_doit eq 3 then b543 = 1 else b543 = 0
     
+   
     ;adding in steps for detrending with percent cover models
     if post_process_file eq 'none' then $
-     run_ftv, path, progressbaryesno, tc_bgw=tc_bgw, b543=b543 else $
+     run_ftv, thispath, progressbaryesno, tc_bgw=tc_bgw, b543=b543 else $
      begin 
       post_process_params = extract_post_process_params(post_process_file)
-      run_ftv,path, progressbaryesno, tc_bgw=tc_bgw, b543=b543, post_process_params=post_process_params 
+      run_ftv,thispath, progressbaryesno, tc_bgw=tc_bgw, b543=b543, post_process_params=post_process_params 
      end
      
-    convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
+    convert_bsq_headers_to_envi, thispath, templatehdr, overwrite=overwrite_hdr
     t2 = systime(1)
     time = float((t2-t1)/60)
     print, ">>> fit to vertices took: ", time," minutes"
@@ -115,8 +121,11 @@ pro ledaps_landtrendr_processor, run_params
   if addyears ge 1 then begin
     print, ">>> Starting add years to fitted outputs"
     t1 = systime(1)
-    convert_bsq_headers_to_envi, path, templatehdr, overwrite=overwrite_hdr
-    outputs_path = path+"outputs"+pse
+    convert_bsq_headers_to_envi, thispath, templatehdr, overwrite=overwrite_hdr
+    ;outputs_path = path+"outputs"+pse
+    
+    outputs_path = thispath	;changed rek march 28
+    
     diag_file = file_search(outputs_path, "*diag.sav", count=n_diag_file)
     ;find the non ftvs
     nonftv_index = where(strmatch(diag_file, "*ftv*") ne 1, n_nonftv_index, complement=ftv_index, ncomplement=n_ftv_index)
@@ -138,7 +147,10 @@ pro ledaps_landtrendr_processor, run_params
   if label_segs eq 1 then begin
     print, ">>> Starting segment labeling"
     t1 = systime(1)
-    outputs_path = path+"outputs"+pse
+    
+    ;outputs_path = path+"outputs"+pse
+    outputs_path = thispath  ;added REK march 28
+    
     diag_file = file_search(outputs_path, "*diag.sav", count=n_diag_file)
     ;find the non ftvs
     nonftv_index = where(strmatch(diag_file, "*ftv*") ne 1, n_nonftv_index, complement=ftv_index, ncomplement=n_ftv_index)
@@ -161,7 +173,9 @@ pro ledaps_landtrendr_processor, run_params
     ;#################################################################################################################
   ;create disturbance and recovery layers
   if keyword_set(dist_rec_snapshots) eq 1 then begin
-    outputs_path = path+"outputs"+pse
+    ;outputs_path = path+"outputs"+pse
+    outputs_path = thispath	;added REK
+    
     diag_file = file_search(outputs_path, "*diag.sav", count=n_diag_file)
     ;find the non ftvs
     nonftv_index = where(strmatch(diag_file, "*ftv*") ne 1, n_nonftv_index, complement=ftv_index, ncomplement=n_ftv_index)
@@ -181,7 +195,8 @@ pro ledaps_landtrendr_processor, run_params
   ;#################################################################################################################
   ;create dark seg outputs
   if keyword_set(dark_seg_outputs) eq 1 then begin
-    outputs_path = path+"outputs"+pse
+    ;outputs_path = path+"outputs"+pse
+    outputs_path = thispath
     diag_file = file_search(outputs_path, "*diag.sav", count=n_diag_file)
     ;find the non ftvs
     nonftv_index = where(strmatch(diag_file, "*ftv*") ne 1, n_nonftv_index, complement=ftv_index, ncomplement=n_ftv_index)

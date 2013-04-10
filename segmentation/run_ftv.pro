@@ -5,7 +5,12 @@ pro run_ftv, path, progressbaryesno, tc_bgw=tc_bgw, b543=b543, post_process_para
 
 
   ;set the path to the outputs
-  outputs = path+"outputs"+pse
+ ; outputs = path+"outputs"+pse
+ ;changing 3/28/13 rek to reflect more specific path name approach  -- the specific outputs path is passed to run_ftv now. 
+
+    outputs = path
+
+ print, 'Checking outputs directory for diag files: '+outputs
   
   ;figure out what indices to fit based on passed key words
   if keyword_set(tc_bgw) eq 1 and keyword_set(b543) eq 1 then doitfor = ['brightness','greenness','wetness','band5', 'band4', 'band3']
@@ -16,6 +21,8 @@ pro run_ftv, path, progressbaryesno, tc_bgw=tc_bgw, b543=b543, post_process_para
   ;find all of the diag files
   diag_files = file_search(outputs, "*diag.sav", count=n_diag_files)
   
+ 
+
   ;if some were found do stuff with it
   if n_diag_files ge 1 then begin
     ;find the ones that are from the initial segmentation
@@ -75,8 +82,8 @@ pro run_ftv, path, progressbaryesno, tc_bgw=tc_bgw, b543=b543, post_process_para
          ; endif
           print, ">>> fitting to vertices: ", doitfor[f]
           ok = process_ftv_chunks(ftv_run_params, progressbaryesno, /interpolate)
-          if ok.ok ne 1 then stop
+          if ok.ok eq 0 then stop
       endfor
     endfor
-  endif 
+  endif else print, 'No diag files found'
 end
