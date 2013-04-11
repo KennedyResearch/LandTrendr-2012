@@ -62,6 +62,7 @@ pro ledaps_landtrendr_processor, run_params
     if image_list ne 0 then adj_img_info, image_list, image_list_type, image_info_savefile
     params = parse_seg_params(path, ppprrr, segparamstxt, image_info_savefile, mask_image=useareafile, subset=subset, eval=eval, resume=resume)
     thispath = params.output_path
+
   
   if segmentation eq 1 then begin
     if file_exists(segparamstxt) eq 0 then begin
