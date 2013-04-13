@@ -1,4 +1,4 @@
-pro run_ftv, path, progressbaryesno, tc_bgw=tc_bgw, b543=b543, post_process_params=post_process_params
+pro run_ftv, path, progressbaryesno, nbr=nbr, tc_bgw=tc_bgw, b543=b543, post_process_params=post_process_params
 
 ;------ identify path separator -------
   pse = path_sep()
@@ -13,10 +13,17 @@ pro run_ftv, path, progressbaryesno, tc_bgw=tc_bgw, b543=b543, post_process_para
  print, 'Checking outputs directory for diag files: '+outputs
   
   ;figure out what indices to fit based on passed key words
+  doitfor = ''
   if keyword_set(tc_bgw) eq 1 and keyword_set(b543) eq 1 then doitfor = ['brightness','greenness','wetness','band5', 'band4', 'band3']
   if keyword_set(tc_bgw) eq 1 and keyword_set(b543) eq 0 then doitfor = ['brightness','greenness','wetness']
   if keyword_set(tc_bgw) eq 0 and keyword_set(b543) eq 1 then doitfor = ['band5', 'band4', 'band3']
-  if keyword_set(tc_bgw) eq 0 and keyword_set(b543) eq 0 then message, "no indices were selected for fitting, check the keywords"
+  if keyword_set(nbr) eq 1 then begin 
+	expand_cols, doitfor, 1, newdims
+	doitfor[newdims[0]-1]='nbr'
+	end
+
+
+   if keyword_set(tc_bgw) eq 0 and keyword_set(b543) and keyword_set(nbr) eq 0 then message, "no indices were selected for fitting, check the keywords"
   
   ;find all of the diag files
   diag_files = file_search(outputs, "*diag.sav", count=n_diag_files)

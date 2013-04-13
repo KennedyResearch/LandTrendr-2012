@@ -101,14 +101,14 @@ pro ledaps_landtrendr_processor, run_params
     t1 = systime(1)
     if run_ftv_doit eq 1 or run_ftv_doit eq 3 then tc_bgw = 1 else tc_bgw = 0
     if run_ftv_doit eq 2 or run_ftv_doit eq 3 then b543 = 1 else b543 = 0
-    
+    if run_ftv_doit ge 4 then nbr=1    else nbr = 0
    
     ;adding in steps for detrending with percent cover models
     if post_process_file eq 'none' then $
-     run_ftv, thispath, progressbaryesno, tc_bgw=tc_bgw, b543=b543 else $
+     run_ftv, thispath, progressbaryesno, nbr=nbr, tc_bgw=tc_bgw, b543=b543 else $
      begin 
       post_process_params = extract_post_process_params(post_process_file)
-      run_ftv,thispath, progressbaryesno, tc_bgw=tc_bgw, b543=b543, post_process_params=post_process_params 
+      run_ftv,thispath, progressbaryesno, nbr=nbr, tc_bgw=tc_bgw, b543=b543, post_process_params=post_process_params 
      end
      
     convert_bsq_headers_to_envi, thispath, templatehdr, overwrite=overwrite_hdr
