@@ -99,8 +99,8 @@ pro ledaps_landtrendr_processor, run_params
   if keyword_set(run_ftv_doit) eq 1 then begin
     print, ">>> Starting fit to vertices"
     t1 = systime(1)
-    if run_ftv_doit eq 1 or run_ftv_doit eq 3 then tc_bgw = 1 else tc_bgw = 0
-    if run_ftv_doit eq 2 or run_ftv_doit eq 3 then b543 = 1 else b543 = 0
+    if run_ftv_doit eq 1 or run_ftv_doit eq 3 or run_ftv_doit eq 5 or run_ftv_doit eq 7 then tc_bgw = 1 else tc_bgw = 0
+    if run_ftv_doit eq 2 or run_ftv_doit eq 3 or run_ftv_doit eq 6 or run_ftv_doit eq 7 then b543 = 1 else b543 = 0
     if run_ftv_doit ge 4 then nbr=1    else nbr = 0
    
     ;adding in steps for detrending with percent cover models
