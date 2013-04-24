@@ -193,14 +193,14 @@ if keyword_set(eval) eq 1 then begin
 	;first see if there is one there with this run name already
 	
 	previous_file = file_search(file_dirname(outbase), '*'+theruns[i].run_name+'*_diag.sav', count=pn)
-  ftvs = matchstr(previous_file, "ftv")
-  nftvs = n_elements(ftvs)
-  if nftvs[0] ne -1 then begin
-    complementftv = bytarr(n_elements(previous_file))
-    complementftv[ftvs] = -1
-    use =where(complementftv eq 0,pn)
-    previous_file = previous_file[use]
-  end  
+	  ftvs = matchstr(previous_file, "ftv")
+ 
+  	if ftvs[0] ne -1 then begin
+    		complementftv = bytarr(n_elements(previous_file))
+    		complementftv[ftvs] = -1
+    		use =where(complementftv eq 0,pn)
+    		previous_file = previous_file[use]
+  	end  
     
     
   
