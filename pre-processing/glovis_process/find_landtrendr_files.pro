@@ -87,7 +87,6 @@ function find_landtrendr_files, path
   n_all_files = n_mtbs_files + n_other_files + n_nlaps_files +n_archv_files+ n_ref_files
    
       
-   
   allyears = intarr(n_all_files)
   type = bytarr(n_all_files)			;1 for mtbs
   ;2 for nlaps
