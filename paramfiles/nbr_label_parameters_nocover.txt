@@ -1,0 +1,14 @@
+static_model         = no_cover_model_nbr
+change_model         = none
+pct_tree_loss1       = 1
+pct_tree_loss20      = 1
+pre_dist_cover       = 1
+pct_tree_gain        = 1
+collapse_dist_angle  = 1
+collapse_recv_angle  = 15
+run_name             = nbr_nocov_lt_labels
+merge_recovery       = yes
+extract_tc_ftv       = yes
+use_relative_mag     = no
+end_year             = -1
+start_year           = -1

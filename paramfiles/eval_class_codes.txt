@@ -1,0 +1,3 @@
+3#greatest_disturbance#Y#GDXX0000X00X00#XXXX0000X00X00,              1, 1, 11, 11, 0, 4
+4#longest_disturbance#Y#LDXX0000G04X00#XXXX0000X00X00,               0, 1, 11, 11, 0, 4
+8#greatest_recovery#Y#LRXX0000G04X00#XXXX0000X00X00,                 0, 1, 11, 11, 0, 4

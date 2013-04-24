@@ -1,0 +1,14 @@
+static_model         = static_nbr_model_pilot_scenes
+change_model         = none
+pct_tree_loss1       = 10
+pct_tree_loss20      = 3
+pre_dist_cover       = 20
+pct_tree_gain        = 5
+collapse_dist_angle  = 1
+collapse_recv_angle  = 15
+run_name             = lt_labels
+merge_recovery       = yes
+extract_tc_ftv       = no
+use_relative_mag     = yes
+end_year             = -1
+start_year           = -1

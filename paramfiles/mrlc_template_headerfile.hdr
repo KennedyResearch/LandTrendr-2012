@@ -1,0 +1,15 @@
+ENVI
+description = {
+  File Imported into ENVI.}
+samples = 8064
+lines   = 7872
+bands   = 1
+header offset = 0
+file type = ENVI Standard
+data type = 2
+interleave = bsq
+sensor type = Unknown
+byte order = 0
+map info = {MRLC_albers_con_eq_area, 1.5000, 1.5000, -2169570.0000, 3131490.0000, 3.0000000000e+001, 3.0000000000e+001, North America 1983, units=Meters}
+projection info = {9, 6378137.0, 6356752.3, 23.000000, -96.000000, 0.0, 0.0, 29.500000, 45.500000, North America 1983, MRLC_albers_con_eq_area, units=Meters}
+wavelength units = Unknown
