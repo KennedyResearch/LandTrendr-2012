@@ -53,14 +53,17 @@
 ;   TODO:
 ;     1. add subset defintion
 ;******************************************************************************************;
-FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year, run=run, suffix=suffix, subset=subset, output_corename=output_corename
+FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year, run=run, $
+			suffix=suffix, subset=subset, output_corename=output_corename, $
+			maskyes=maskyes
 
   IF n_elements(diagfile) EQ 0 THEN return, -1
   IF n_elements(suffix) EQ 0 THEN suffix = 'ltmetrix'
   IF n_elements(end_year) EQ 0 THEN end_year=-1
   IF n_elements(start_year) EQ 0 THEN start_year=-1
   IF n_elements(run) EQ 0 THEN run=''
-  
+  IF n_elements(maskyes) eq 0 then maskyes = 0	;defaults to NOT using the distrec images for filtering
+
   ;TODO: how to better handle the file search, currently assuming there is only one
   ; for each file type, but potentially there could be multiple.
   
@@ -105,8 +108,8 @@ FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year,
     basename = strmid(diagbase, 0, strlen(diagbase)-9)
     distmask_file = file_search(diagdir, basename + '*greatest_disturbance*loose.bsq')
     recmask_file = file_search(diagdir, basename + '*longest_recovery*loose.bsq')
-    if n_elements(distmask_file) ne 1 then message, 'Greatest disturbance search found this:'+distmask
-    if n_elements(recmask_file) ne 1 then message, 'Recovery search found this: '+recmask
+    if n_elements(distmask_file) ne 1 then message, 'Greatest disturbance search found this:'+distmask_file
+    if n_elements(recmask_file) ne 1 then message, 'Recovery search found this: '+recmask_file
     
 
   
@@ -320,7 +323,8 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
 	
 	;adding in the mask filter - if zero in both dist and rec, then we use mean val
 	
-        maskval = (distmask[x,y]+recmask[x,y]) ne 0	;if set to 1, then 
+        if maskyes eq 1 then maskval = (distmask[x,y]+recmask[x,y]) ne 0 else maskval=1	;if set to 0, then assign zeros
+			;maskyes is a user  
 	
         this_metrics = calculate_history_metrics(all_years, vertexes, vertvals, modifier, b_stack, g_stack, w_stack, start_year, end_year)
         
