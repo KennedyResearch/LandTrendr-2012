@@ -107,6 +107,8 @@ pro cloud_masking_gui_img_dif_event, event
     b1_multiplier = float(b1_value)/float(2000)
     b1_adj = info.b1range*b1_multiplier
     b1_thresh = round(info.b1max+b1_adj)
+    print, 'b1_thresh '+string(b1_thresh)
+    print, 'b1_adj '+string(b1_adj)
   endif else b1_thresh = -99999
   
   ;band 4
@@ -445,7 +447,8 @@ pro cloud_masking_gui_img_dif, image, ledaps=ledaps
   ;get min and max values for the sliders and thresholding adjustments
   subset=mastersubset
   b1max = min(difimg[*,*,0])
-  b1range = range(difimg[*,*,0])
+  b1range = range(long(difimg[*,*,0]))
+  
   b4min = min(difimg[*,*,1])
   b4range = range(difimg[*,*,1])
   b5min = min(difimg[*,*,2])
