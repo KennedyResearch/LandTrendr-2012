@@ -14,6 +14,7 @@
 ;   * format other than .bsq handling
 ;
 ;-
+
 pro concatenate_metadata, inputs, output_metadata_file, params=params
 ;------ identify path separator -------
   pse = path_sep()
@@ -37,7 +38,14 @@ pro concatenate_metadata, inputs, output_metadata_file, params=params
   
   for i = 0, n_elements(inputs)-1 do begin
     this_meta = stringswap(inputs[i], ".bsq", "_meta.txt")
-    if file_test(this_meta) eq 0 then message, this_meta + " does not exists!"
+    if file_test(this_meta) eq 0 then begin
+        print, this_meta + " does not exist. Creating..."
+        print, inputs[i]
+        split_path = STRSPLIT(inputs[i], '/', /extract)
+        root_path = pse + STRJOIN(split_path[0:N_Elements(split_path)-4],'/') + pse 
+        make_metadata_for_ledaps, root_path
+        print, "Created file " + this_meta
+    endif
     if i gt 0 then command1 = command1 + connector + this_meta else command1 = command_orig + this_meta
   endfor
   commanddoit = command1 + outpipe + output_metadata_file
@@ -53,9 +61,10 @@ pro concatenate_metadata, inputs, output_metadata_file, params=params
     
     for i = 0, half1-1 do begin
       this_meta = stringswap(inputs[i], ".bsq", "_meta.txt")
-      if file_test(this_meta) eq 0 then message, this_meta + " does not exists!"
+      if file_test(this_meta) eq 0 then print, this_meta + " does not exist!"
       if i gt 0 then command2 = command2 + connector + this_meta else command2 = command_orig + this_meta
     endfor
+
     commanddoit = command2 + outpipe + out1
     if !Version.(1) ne "Win32" then spawn, commanddoit else spawn, commanddoit, /hide
     
