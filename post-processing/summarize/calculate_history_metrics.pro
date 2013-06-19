@@ -21,7 +21,8 @@
 ;  March 2013.  REK updated take out unnecessary history variables. 
 
 ;-
-function calculate_history_metrics, all_years, vertexes, vertvals, modifier, b_stack, g_stack, w_stack, start_year, end_year, dist_thresh=dist_thresh, rec_thresh=rec_thresh
+function calculate_history_metrics, all_years, vertexes, vertvals, modifier, b_stack, g_stack, w_stack,n_stack, $
+		 start_year, end_year, dist_thresh=dist_thresh, rec_thresh=rec_thresh
   
     if n_elements(dist_thresh) eq 0 then dist_thresh = 15
     if n_elements(rec_thresh) eq 0 then rec_thresh = 15
@@ -37,12 +38,14 @@ function calculate_history_metrics, all_years, vertexes, vertvals, modifier, b_s
     b_t = intarr(n)
     g_t = intarr(n)
     w_t = intarr(n)
-    
+    n_t = intarr(n);added june 19 2013 rek    
+
     ;delta of B, G, W at t
     db_t = intarr(n)
     dg_t = intarr(n)
     dw_t = intarr(n)
-    
+    dn_t = intarr[n] ;added june 19 2013 rek
+
     	;recent vertex B, G, W
     	;rv_b = intarr(n)
     	;rv_g = intarr(n)
@@ -61,7 +64,8 @@ function calculate_history_metrics, all_years, vertexes, vertvals, modifier, b_s
     
     valids = where(vertexes gt 0, n_valid)
     if n_valid lt 2 then begin
-      return, {b_t:b_t, g_t:g_t, w_t:w_t, db_t:db_t, dg_t:dg_t, dw_t:dw_t, ts_v:ts_v}	;shortened march 2013; others not used. 
+      return, {b_t:b_t, g_t:g_t, w_t:w_t, n_t:n_t, db_t:db_t, dg_t:dg_t, dw_t:dw_t, dn_t:dn_t, ts_v:ts_v}	;shortened march 2013; others not used. 
+;updated june 19 2013 rek for nbr indices
       
     		;return, {b_t:b_t, g_t:g_t, w_t:w_t, db_t:db_t, dg_t:dg_t, dw_t:dw_t, rv_b:rv_b, rv_g:rv_g, rv_w:rv_w, ts_v:ts_v, pv_b:pv_b, pv_g:pv_g, pv_w:pv_w, p_dur:p_dur}
     endif
@@ -96,10 +100,13 @@ function calculate_history_metrics, all_years, vertexes, vertvals, modifier, b_s
         b_t[this_index] = b_stack[before] + fix((b_stack[before+1]-b_stack[before])*(this_year-all_years[before])/(all_years[before+1]-all_years[before]))
         g_t[this_index] = g_stack[before] + fix((g_stack[before+1]-g_stack[before])*(this_year-all_years[before])/(all_years[before+1]-all_years[before]))
         w_t[this_index] = w_stack[before] + fix((w_stack[before+1]-w_stack[before])*(this_year-all_years[before])/(all_years[before+1]-all_years[before]))
+	n_t[this_index] = n_stack[before] + fix((n_stack[before+1]-n_stack[before])*(this_year-all_years[before])/(all_years[before+1]-all_years[before])) ;added june 19 2013 rek
+
       endif else begin 
         b_t[this_index] = b_stack[this]
         g_t[this_index] = g_stack[this]
         w_t[this_index] = w_stack[this]
+	n_t[this_index] = n_stack[this] ;added june 19 rek
       endelse
     
     
@@ -125,7 +132,8 @@ function calculate_history_metrics, all_years, vertexes, vertvals, modifier, b_s
       db_t[this_index] = b_t[this_year-start_year] - b_stack[bgw_index[seg_start]]
       dg_t[this_index] = g_t[this_year-start_year] - g_stack[bgw_index[seg_start]]
       dw_t[this_index] = w_t[this_year-start_year] - w_stack[bgw_index[seg_start]]
-      
+      dn_t[this_index] = n_t[this_year-start_year] - n_stack[bgw_index[seg_start]] ;added june 19 rek
+
       		;if there is a previous segment
       		;if seg_start gt 0 then begin
       		;  pv_b[this_index] = b_stack[bgw_index[seg_start-1]]
@@ -135,7 +143,7 @@ function calculate_history_metrics, all_years, vertexes, vertvals, modifier, b_s
        		; p_dur[this_index] = used_durs[seg_start-1]
       		;endif
     endfor
-    return, {b_t:b_t, g_t:g_t, w_t:w_t, db_t:db_t, dg_t:dg_t, dw_t:dw_t,ts_v:ts_v}
+    return, {b_t:b_t, g_t:g_t, w_t:w_t, n_t:n_t, db_t:db_t, dg_t:dg_t, dw_t:dw_t,dn_t:dn_t, ts_v:ts_v}
   
     
     		;return, {b_t:b_t, g_t:g_t, w_t:w_t, db_t:db_t, dg_t:dg_t, dw_t:dw_t, rv_b:rv_b, rv_g:rv_g, rv_w:rv_w, ts_v:ts_v, pv_b:pv_b, pv_g:pv_g, pv_w:pv_w, p_dur:p_dur}

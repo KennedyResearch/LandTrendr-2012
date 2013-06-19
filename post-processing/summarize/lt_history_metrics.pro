@@ -186,7 +186,8 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
   output_image_group = ["_b_t.bsq", "_g_t.bsq", "_w_t.bsq", $
     "_db_t.bsq", "_dg_t.bsq", "_dw_t.bsq", $
     			;"_rv_b.bsq", "_rv_g.bsq", "_rv_w.bsq", $
-    "_ts_v.bsq"]	;	, $
+    "_ts_v.bsq", $
+    "_nbr_t.bsq", "_dnbr_t.bsq"]	;	added june 19 2013 rek, $
     			;"_pv_b.bsq", "_pv_g.bsq", "_pv_w.bsq", $
     			;"_pdur.bsq"]
     
@@ -277,7 +278,10 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
     zot_img, ftv_tcg_file, hdr, ftv_tcg, subset = this_subset
     this_subset =  chunks[current_chunk].coords
     zot_img, ftv_tcw_file, hdr, ftv_tcw, subset = this_subset
-    
+    this_subset =  chunks[current_chunk].coords			;added rek june 19, 2013
+    zot_img, ftv_nbr_file, hdr, ftv_nbr, subset = this_subset    ; ditto
+
+
     ;read the two mask files ;; added march 2013. REK
     this_subset =  chunks[current_chunk].coords
     zot_img, distmask_file, dm_hdr, distmask, subset=this_subset, layers=[1]	;open the year of onset layer;  if zero in a pixel, then nothing happened
@@ -293,12 +297,14 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
     b_t = intarr(xsize, ysize, n_years)
     g_t = intarr(xsize, ysize, n_years)
     w_t = intarr(xsize, ysize, n_years)
-    
+    n_t = intarr(xsize, ysize, n_years)    
+
     ;delta of B, G, W at t
     db_t = intarr(xsize, ysize, n_years)
     dg_t = intarr(xsize, ysize, n_years)
     dw_t = intarr(xsize, ysize, n_years)
-    
+    dn_t = intarr(xsize, ysize, n_years)
+
     		;recent vertex B, G, W
     		;rv_b = intarr(xsize, ysize, n_years)
     		;rv_g = intarr(xsize, ysize, n_years)
@@ -322,13 +328,14 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
         b_stack = ftv_tcb[x, y, *]
         g_stack = ftv_tcg[x, y, *]
         w_stack = ftv_tcw[x, y, *]
-	
+	n_stack = ftv_nbr[x, y, *]
+
 	;adding in the mask filter - if zero in both dist and rec, then we use mean val
 	
         if maskyes eq 1 then maskval = (distmask[x,y]+recmask[x,y]) ne 0 else maskval=1	;if set to 0, then assign zeros
 			;maskyes is a user  
 	
-        this_metrics = calculate_history_metrics(all_years, vertexes, vertvals, modifier, b_stack, g_stack, w_stack, start_year, end_year)
+        this_metrics = calculate_history_metrics(all_years, vertexes, vertvals, modifier, b_stack, g_stack, w_stack, n_stack, start_year, end_year)
         
 	;now assign values.  If the maskval is 0, then we assign values like this is flat.  
 	
@@ -336,11 +343,13 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
 	  b_t[x, y, *] = this_metrics.b_t
           g_t[x, y, *] = this_metrics.g_t
           w_t[x, y, *] = this_metrics.w_t
-        
+          n_t[x, y, *] = this_metrics.n_t        ;added june 19 2013 rek
+
           db_t[x, y, *] = this_metrics.db_t
           dg_t[x, y, *] = this_metrics.dg_t
           dw_t[x, y, *] = this_metrics.dw_t
-        
+          dn_t[x, y, *] = this_metrics.dn_t   ;added june 19 2013 rek
+
         	;rv_b[x, y, *] = this_metrics.rv_b
         	;rv_g[x, y, *] = this_metrics.rv_g
         	;rv_w[x, y, *] = this_metrics.rv_w
@@ -356,10 +365,12 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
 	  b_t[x, y, *] = mean(this_metrics.b_t)
           g_t[x, y, *] = mean(this_metrics.g_t)
           w_t[x, y, *] = mean(this_metrics.w_t)
-        
+          n_t[x, y, *] = mean(this_metrics.n_t) ;added june 19 2013 rek
+
           db_t[x, y, *] = 0
           dg_t[x, y, *] = 0
           dw_t[x, y, *] = 0
+          dn_t[x, y, *] = 0    ;added june 19 2013 rek
 	  
           ts_v[x, y, *] = generic_tsv	;set to generic incremental val        
 	 
@@ -427,8 +438,23 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
  if file_test(outmeta) eq 0 then $
      concatenate_metadata, [distmask_file, recmask_file, ftv_tcw_file, vv_file, vy_file],outmeta,params=metadata
 
+   ;n_t
+    this_file = core_name + output_image_group[7]
+    openu, un, this_file, /get_lun
+    for layercount = 0ull, n_years-1 do begin
+      point_lun, un, layersize * layercount + within_layer_offset
+      writeu, un, n_t[*,*,layercount]
+    end
+    free_lun, un
+      outmeta = stringswap(this_file, 'bsq', 'meta.txt')
+  metadata={parent_file1: ftv_nbr_file, $
+      parent_file2: vv_file, $
+      masking_file1: distmask_file, $
+      masking_file2:recmask_file, $
+      creationdate: date}
+ if file_test(outmeta) eq 0 then $
+     concatenate_metadata, [distmask_file, recmask_file, ftv_nbr_file, vv_file, vy_file],outmeta,params=metadata
 
-  
 
 
     ;db_t
@@ -485,10 +511,27 @@ concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_fi
  if file_test(outmeta) eq 0 then $
      concatenate_metadata, [distmask_file, recmask_file, ftv_tcw_file, vv_file, vy_file],outmeta,params=metadata
 
+  ;dn_t
+    this_file = core_name + output_image_group[8]
+    openu, un, this_file, /get_lun
+    for layercount = 0ull, n_years-1 do begin
+      point_lun, un, layersize * layercount + within_layer_offset
+      writeu, un, n_t[*,*,layercount]
+    end
+    free_lun, un
+      outmeta = stringswap(this_file, 'bsq', 'meta.txt')
+  metadata={parent_file1: ftv_nbr_file, $
+      parent_file2: vv_file, $
+      masking_file1: distmask_file, $
+      masking_file2:recmask_file, $
+      creationdate: date}
+ if file_test(outmeta) eq 0 then $
+     concatenate_metadata, [distmask_file, recmask_file, ftv_nbr_file, vv_file, vy_file],outmeta,params=metadata
 
 
 
-;dw_t
+
+;ts_v
     this_file = core_name + output_image_group[6]
     openu, un, this_file, /get_lun
     for layercount = 0ull, n_years-1 do begin
