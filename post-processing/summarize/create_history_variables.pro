@@ -1,6 +1,11 @@
-pro create_history_variables, diagfile, template_hdr
+pro create_history_variables, diagfile, template_hdr, maskyes=maskyes
 ;------ identify path separator -------
   pse = path_sep()
+
+	;maskyes uses the disturbance and recovery maps to filter -- only nondisturbed
+	; and nonrecovering pixels change values, all others are static. 
+
+  if n_elements(maskyes) eq 0 then maskyes = 0 else maskyes = 1
 
   for i=0, n_elements(diagfile)-1 do begin
     print, "making history variables for: ", diagfile[i]
@@ -20,7 +25,7 @@ pro create_history_variables, diagfile, template_hdr
     ;output_corename = outdir + index + pse + tsa + pse + corename
     ;file_mkdir, outdir + pse + index + pse + tsa
     
-    ok = lt_history_metrics(diagfile[i], end_year=end_year, start_year=start_year, output_corename=output_corename);, subset=[[-2043945.0000,2878005.0000],[-2013495.0000, 2843955.0000]]
+    ok = lt_history_metrics(diagfile[i], maskyes=maskyes, end_year=end_year, start_year=start_year, output_corename=output_corename);, subset=[[-2043945.0000,2878005.0000],[-2013495.0000, 2843955.0000]]
  
  
  

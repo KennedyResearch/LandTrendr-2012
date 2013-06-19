@@ -98,6 +98,8 @@ FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year,
   ftv_tcb_file = stringswap(diagfile, "_diag.sav", "_brightness_ftv_fitted.bsq")
   ftv_tcg_file = stringswap(diagfile, "_diag.sav", "_greenness_ftv_fitted.bsq")
   ftv_tcw_file = stringswap(diagfile, "_diag.sav", "_wetness_ftv_fitted.bsq")
+  ftv_nbr_file = stringswap(diagfile, "_diag.sav", "_nbr_ftv_fitted.bsq")	;june 19 2013 rek
+
 
   ;get the greatest_disturbance*loose.bsq file, and the longest_recovery file. Anywhere that 
   ;   does not have a value in these two will have a mean value 
