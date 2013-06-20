@@ -44,7 +44,7 @@ function calculate_history_metrics, all_years, vertexes, vertvals, modifier, b_s
     db_t = intarr(n)
     dg_t = intarr(n)
     dw_t = intarr(n)
-    dn_t = intarr[n] ;added june 19 2013 rek
+    dn_t = intarr(n) ;added june 19 2013 rek
 
     	;recent vertex B, G, W
     	;rv_b = intarr(n)
