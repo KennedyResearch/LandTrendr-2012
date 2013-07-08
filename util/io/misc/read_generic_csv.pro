@@ -91,6 +91,7 @@ if file_exists(filename) eq 0 then begin
       (types[i] eq 'float'):  z[i] = '0.'
       (types[i] eq 'string'):  z[i] = '""'
       (types[i] eq 'long'): z[i] = '0l'
+      (types[i] eq 'ulong'):  z[i] = '0ul'
       else:	begin
                print, 'No types defined on first row for column '+string(i)+' Beware unexpected results.'
                z[i] = '""'	;default to string, always recoverable
@@ -135,7 +136,7 @@ if file_exists(filename) eq 0 then begin
 
  ;read the file through to end, counting number of entries
 
-   count = 0
+   count = 0ul
    while not(eof(un)) do begin
       readf, un, tempstring
       count = count + 1
@@ -160,7 +161,7 @@ if file_exists(filename) eq 0 then begin
    ;on_ioerror, errorplace
    suspicious_count = 0
 
-   for i = 0, count-1 do begin
+   for i = 0l, count-1 do begin
      readf, un, tempstring
 
      seps = strsplit(tempstring, ',', /extract, /preserve_null)
@@ -181,6 +182,7 @@ if file_exists(filename) eq 0 then begin
 
 
      vals[i] = oneval
+     
 	 errorplace:	;just skip the error
 
    end

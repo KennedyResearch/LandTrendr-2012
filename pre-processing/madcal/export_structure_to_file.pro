@@ -36,7 +36,7 @@
 ;                                                                             
 ;**************************************************************************** 
 
-pro export_structure_to_file, struct, filename, append=append, noheader=noheader
+pro export_structure_to_file, struct, filename, append=append, noheader=noheader, include_type=include_type
 
   if n_elements(noheader) eq 0 then noheader = 1 else noheader = 0
 
@@ -59,12 +59,45 @@ pro export_structure_to_file, struct, filename, append=append, noheader=noheader
   isbyte = bytarr(nt)
   for i = 0,nt-1 do isbyte[i] = (size(struct[0].(i), /type) eq 1)
 
+
+;write the types out if asked for
+
+ if n_elements(include_type) ne 0 then begin   ;add the data type for easier reading
+    ws = ''
+    for i = 0, nt-2 do begin 
+        thistype = size(struct[0].(i), /type)
+        case 1 of 
+        thistype eq 3:  ws = ws+'long'+','
+        thistype eq 13: ws = ws + 'ulong'+','
+        thistype eq 2 or thistype eq 1:  ws = ws+'integer'+','
+        thistype eq 4:  ws = ws+'float'+','
+         thistype eq 7:  ws = ws+'string'+','
+        else:  ws = ws + strcompress('type'+string(thistype), /rem)+','
+        endcase
+    end
+    ;now do the last one
+    thistype = size(struct[0].(nt-1), /type)
+    case 1 of 
+        thistype eq 3:  ws = ws+'long'+','
+        thistype eq 13: ws = ws + 'ulong'+','
+        thistype eq 2 or thistype eq 1:  ws = ws+'integer'+','
+        thistype eq 4:  ws = ws+'float'+','
+        thistype eq 7:  ws = ws+'string'+','
+        else:  ws = ws + strcompress('type'+string(thistype), /rem)+','
+        endcase
+    ;now write out
+    printf, un, ws
+  end
+  
+        
   ws = ''
   if noheader eq 1 then begin
     for i = 0, nt-2 do ws = ws+tn[i]+','
     ws = ws +tn[nt-1]
     printf, un, ws
   end
+  
+
 
   for i = 0l, n-1 do begin
     ws = ''
