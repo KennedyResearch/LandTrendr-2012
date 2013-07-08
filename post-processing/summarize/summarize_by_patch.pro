@@ -81,7 +81,8 @@ for f = 0, n_sumbys-1 do $
   end else skip_patch_stats = 0   ;if the csvfile does not exist, set this flag so patch stats will get called. 
   
  ;CHECK TO SEE IF THE IMAGE LIST HAS BEEN GENERATED
-    metafile = stringswap(patch_file, '.bsq', '_meta.txt')
+       
+     metafile = file_dirname(outcsvfile)+stringswap(file_basename(patch_file), '.bsq', '_meta.txt')
     if file_exists(metafile) then begin
           imagelist_file = stringswap(patch_file, '.bsq', '_image_list.csv')
           if file_exists(imagelist_file) eq 0 then begin  ;if not already made
@@ -182,7 +183,7 @@ if skip_patch_stats eq 0 then begin
     patchfilebase = file_basename(patch_file)
     
     base = {patchfilename:patchfilebase, object_id:0ul, plot_id:0ul, x:0., y:0., latx:0., laty:0., $
-              modelregion:'', pixelcount:0ul, $
+              pixelcount:0ul, $
               edgepixelcount:0ul, edgearearatio:0., tsa: 0ul, $
               dom_axis_length:0., norm_axis_length:0., ratio_dom_norm:0., $
               variance_explained_dom:0., ratio_dom_area:0.}
@@ -400,6 +401,8 @@ for f = 0, n_sumbys -1 do begin
          stat eq 'mode': begin 
                         j=histogram(final, omin=omin)
                         thisval = (where(j eq max(j)))[0]+omin
+                       
+                        
                         end
          else:  begin 
                   print, 'Stat type not found'
@@ -423,6 +426,7 @@ end ;sumby info
 
 
 ;WRITE IT OUT!  
+
 
 export_structure_to_file, info, outcsvfile, /include_type 
 

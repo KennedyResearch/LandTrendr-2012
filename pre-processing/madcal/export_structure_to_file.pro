@@ -125,6 +125,7 @@ pro export_structure_to_file, struct, filename, append=append, noheader=noheader
     ;add the last one without a comma
     if (ispoint[j]) then $
       thisone = '<pointer>' else $
+      if (isbyte[j]) then thisone = string(fix(bu.(j))) else $  ;have to convert bytes before stringing, else get ASCII
       begin
       thisone = string(bu.(nt-1))
       if (isfloat[nt-1]) then begin
