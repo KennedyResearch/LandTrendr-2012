@@ -109,7 +109,7 @@ FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year,
     diagbase = file_basename(diag_file)
     basename = strmid(diagbase, 0, strlen(diagbase)-9)
     distmask_file = file_search(diagdir, basename + '*greatest_disturbance*loose.bsq')
-    recmask_file = file_search(diagdir, basename + '*longest_recovery*loose.bsq')
+    recmask_file = file_search(diagdir, basename + '*greatest_recovery*loose.bsq')
     if n_elements(distmask_file) ne 1 then message, 'Greatest disturbance search found this:'+distmask_file
     if n_elements(recmask_file) ne 1 then message, 'Recovery search found this: '+recmask_file
     
