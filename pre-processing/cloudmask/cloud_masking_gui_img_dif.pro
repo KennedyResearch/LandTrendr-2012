@@ -450,9 +450,9 @@ pro cloud_masking_gui_img_dif, image, ledaps=ledaps
   b1range = range(long(difimg[*,*,0]))
   
   b4min = min(difimg[*,*,1])
-  b4range = range(difimg[*,*,1])
+  b4range = range(long(difimg[*,*,1]))
   b5min = min(difimg[*,*,2])
-  b5range = range(difimg[*,*,2])
+  b5range = range(long(difimg[*,*,2]))
   therm_min = min(difimg[*,*,3])
   therm_range = range(difimg[*,*,3])
   ;make its image
@@ -465,13 +465,13 @@ pro cloud_masking_gui_img_dif, image, ledaps=ledaps
   ysize = round(hdr.filesize[1]*denom)
   img321_min = min(img321)
   img321_max = max(img321)
-  img321_range = range(img321)
+  img321_range = range(long(img321))
   img321 = reverse(congrid(temporary(img321), xsize, ysize, 3),2) ; reverse,2
   
   zot_img, image, hdr, img543, layers = [5,4,3], subset=subset
   img543_min = min(img543)
   img543_max = max(img543)
-  img543_range = range(img543)
+  img543_range = range(long(img543))
   img543 = reverse(congrid(temporary(img543), xsize, ysize, 3),2) ; reverse,2
   
   if n_thermal ne 0 then begin
