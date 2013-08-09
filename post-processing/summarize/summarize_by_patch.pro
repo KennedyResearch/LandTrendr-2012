@@ -81,14 +81,20 @@ for f = 0, n_sumbys-1 do $
   end else skip_patch_stats = 0   ;if the csvfile does not exist, set this flag so patch stats will get called. 
   
  ;CHECK TO SEE IF THE IMAGE LIST HAS BEEN GENERATED
-       
-     metafile = file_dirname(outcsvfile)+stringswap(file_basename(patch_file), '.bsq', '_meta.txt')
-    if file_exists(metafile) then begin
-          imagelist_file = stringswap(patch_file, '.bsq', '_image_list.csv')
+      
+     metafile = file_dirname(patch_file)+path_sep()+stringswap(file_basename(patch_file), '.bsq', '_meta.txt')
+   
+if file_exists(metafile) then begin
+          imagelist_file = stringswap(outcsvfile, '.csv', '_image_list.csv')
           if file_exists(imagelist_file) eq 0 then begin  ;if not already made
               base = {platform:'', imgyear:0, julday:0, reflfile:'', tcfile:'', cloudfile:''}
               icount = 0
               cloudfile = '' 
+
+   		;get the path name for the images
+                    zed = strpos(patch_file, 'outputs')
+                    baseimagepath = strmid(patch_file, 0, zed)+'images'+path_sep()
+
               openr, mun, metafile,/get_lun
               while cloudfile ne 'no_match' do begin
                  query_file2, mun, 'DATA: ledaps image', /norestart
@@ -96,23 +102,32 @@ for f = 0, n_sumbys-1 do $
                  query_file2, mun, 'CLOUDMASK_FILE: ', cloudfile, /norestart, /nextlineonly
                  if cloudfile ne 'no_match' then begin
                    query_file2, mun, 'TASSELED_CAP_FILE: ', tcfile, /norestart, /nextlineonly
-                   if icount eq 0 then imagelist_struct = base else expand_cols, imagelist_struct, 1, newdims
-                   imagelist_struct[icount].reflfile = strcompress(imagefile, /rem)
-                   imagelist_struct[icount].tcfile = strcompress(tcfile, /rem)
-                   imagelist_struct[icount].cloudfile = strcompress(cloudfile,/rem)
-                   
-                   ;get the year
+                    ;get the year
                    thisname = file_basename(strcompress(imagefile, /rem))
                    breakone = strpos(thisname, '_')
                    year = fix(strmid(thisname, breakone+1, 4))
                    julday = fix(strmid(thisname, breakone+6, 3))
                    if year lt 1970 or year gt 2050 then message, 'could not get year.  image file '+thisname
                    if julday lt 0 or julday gt 366 then message, 'could not get julday.  image file '+thisname
-                   imagelist_struct[icount].imgyear = year
+   
+		   ;get the full pathname 
+	            imagefile = baseimagepath+strcompress(string(year),/rem)+path_sep()+$
+					strcompress(imagefile, /rem)
+		    tcfile = baseimagepath+strcompress(string(year),/rem)+path_sep()+$
+                                        strcompress(tcfile, /rem)
+		    cloudfile = baseimagepath+strcompress(string(year),/rem)+path_sep()+$
+                                        strcompress(cloudfile, /rem) 	
+
+		
+                   if icount eq 0 then imagelist_struct = base else expand_cols, imagelist_struct, 1, newdims
+                   imagelist_struct[icount].reflfile = strcompress(imagefile, /rem)
+                   imagelist_struct[icount].tcfile = strcompress(tcfile, /rem)
+                   imagelist_struct[icount].cloudfile = strcompress(cloudfile,/rem)
+                    imagelist_struct[icount].imgyear = year
                    imagelist_struct[icount].julday = julday
-                   if strmid(thisname,2,1) eq '5' then imagelist_struct[icount].platform = 'TM' else $
+		   if strmid(thisname,2,1) eq '5' then imagelist_struct[icount].platform = 'TM' else $
                             imagelist_struct[icount].platform = 'ETM'
-                            
+         
                    icount=icount+1
                  end
               end
@@ -122,7 +137,27 @@ for f = 0, n_sumbys-1 do $
 ;              
 ;               imagelist_struct = imagelist_struct[0:count-2] ;truncate last one. 
 ;               
-              export_structure_to_file,imagelist_struct,  imagelist_file
+
+		;fix dupes
+		zzz = fast_unique(imagelist_struct.reflfile)
+			;order the unique files
+		nzzz = n_elements(zzz)	;how many uinque files
+		zzz_ind = lonarr(nzzz)	;set up index
+		for ifile = 0, nzzz-1 do $
+		   zzz_ind[ifile] = (where(imagelist_struct.reflfile eq zzz[ifile]))[0]
+		
+		;now assign them
+		imagelist_struct=imagelist_struct[zzz_ind]
+ 		    
+
+
+
+	;	print, 'need to set up approach to get unique vals for each of these in case we somehow snage dupes'
+	;	print, 'consider fast_Unique, then loop of wheres'
+	;	stop
+
+
+              export_structure_to_file,imagelist_struct,  imagelist_file, /include_type
                
           end  ;making the image list file
           
@@ -336,14 +371,30 @@ for f = 0, n_sumbys -1 do begin
    ;check to make sure it's the same size as the patch image. 
    
     check = hdr.filesize-phdr.filesize
-    if total(check) ne 0 then begin
-          print, sumby_info[f].file + ' does not have same dimensions as the patch image'
-          return
-    end
+    if total(check) eq 0 then begin
+        subset=master_subset
+         zot_img, sumby_info[f].file, hdr, thislayer1, subset=subset, layers = [sumby_info[f].layer]
+     end else  begin
+	;if we're here, that means the extraction image is smaller than the patch image. 
+	;  if it's larger, it's already been truncated down to the patch image.
+	;  so all we have to do is fill out the gap.  Use fix edge, with the extraction
+	;  image as the constraint image and the patch image as the proposed image
 
+          s1 = master_subset    ;this is the patch image
+	  s2 = subset		;this one has been truncated to match the patch
+	  d1 = fix_edge(s1, s2, /map)	 ;proposed, constraint
+	  diff1 = d1.diffs / [[hdr.pixelsize], [hdr.pixelsize]]
+	  
+          subset=master_subset
+          zot_img, sumby_info[f].file, hdr, temp, subset=subset, layers = [sumby_info[f].layer]
+          thislayer1 = replicate(temp[0]-temp[0], phdr.filesize[0]) 	;set up zeros of appropriate dta type
+	  thislayer1 = fill_arr(thislayer1, phdr.filesize[1])	;then fill down
+	  upleft = long(diff1[*,0])*[-1,1]
+	  thislayer1[upleft[0]:upleft[0]+hdr.filesize[0]-1, upleft[1]:upleft[1]+hdr.filesize[1]-1]=temp
+    end
  
-  subset=master_subset
-  zot_img, sumby_info[f].file, hdr, thislayer1, subset=subset, layers = [sumby_info[f].layer]
+
+
    print, 'Working on '+sumby_info[f].nickname
    
    ;add the tags to the structure
