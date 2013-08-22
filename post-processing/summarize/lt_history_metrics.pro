@@ -110,7 +110,17 @@ FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year,
     basename = strmid(diagbase, 0, strlen(diagbase)-9)
     distmask_file = file_search(diagdir, basename + '*greatest_disturbance*loose.bsq')
     recmask_file = file_search(diagdir, basename + '*greatest_recovery*loose.bsq')
-    if n_elements(distmask_file) ne 1 then message, 'Greatest disturbance search found this:'+distmask_file
+    if n_elements(distmask_file) gt 1 then begin
+	;could be that we have second greatest disturbance, etc.
+	;first get the base nam
+	base=file_basename(distmask_file)
+	ap = strpos(base, 'greatest_disturbance')
+	;find the shortest one.  then see if the other has the same timetamp
+	mp = min(ap)
+	distmask_file = distmask_file[where(ap eq mp)]
+     end
+
+    ;if n_elements(distmask_file) ne 1 then message, 'Greatest disturbance search found this:'+distmask_file
     if n_elements(recmask_file) ne 1 then message, 'Recovery search found this: '+recmask_file
     
 
@@ -516,7 +526,7 @@ concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_fi
     openu, un, this_file, /get_lun
     for layercount = 0ull, n_years-1 do begin
       point_lun, un, layersize * layercount + within_layer_offset
-      writeu, un, n_t[*,*,layercount]
+      writeu, un, dn_t[*,*,layercount]
     end
     free_lun, un
       outmeta = stringswap(this_file, 'bsq', 'meta.txt')
