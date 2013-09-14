@@ -1,4 +1,6 @@
-pro create_history_variables, diagfile, template_hdr, maskyes=maskyes
+pro create_history_variables, diagfile, template_hdr, maskyes=maskyes, recovery_mask_override=recovery_mask_override
+
+
 ;------ identify path separator -------
   pse = path_sep()
 
@@ -25,7 +27,10 @@ pro create_history_variables, diagfile, template_hdr, maskyes=maskyes
     ;output_corename = outdir + index + pse + tsa + pse + corename
     ;file_mkdir, outdir + pse + index + pse + tsa
     
-    ok = lt_history_metrics(diagfile[i], maskyes=maskyes, end_year=end_year, start_year=start_year, output_corename=output_corename);, subset=[[-2043945.0000,2878005.0000],[-2013495.0000, 2843955.0000]]
+    
+    ok = lt_history_metrics(diagfile[i], maskyes=maskyes, end_year=end_year, $
+		start_year=start_year, output_corename=output_corename, $
+		recovery_mask_override=recovery_mask_override);, subset=[[-2043945.0000,2878005.0000],[-2013495.0000, 2843955.0000]]
  
  
  

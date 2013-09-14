@@ -55,7 +55,7 @@
 ;******************************************************************************************;
 FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year, run=run, $
 			suffix=suffix, subset=subset, output_corename=output_corename, $
-			maskyes=maskyes
+			maskyes=maskyes, recovery_mask_override=recovery_mask_override
 
   IF n_elements(diagfile) EQ 0 THEN return, -1
   IF n_elements(suffix) EQ 0 THEN suffix = 'ltmetrix'
@@ -110,6 +110,15 @@ FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year,
     basename = strmid(diagbase, 0, strlen(diagbase)-9)
     distmask_file = file_search(diagdir, basename + '*greatest_disturbance*loose.bsq')
     recmask_file = file_search(diagdir, basename + '*greatest_recovery*loose.bsq')
+
+  ;it's possible the user wants to override with a special recovery layer
+   if n_elements(recovery_mask_override) ne 0 then begin
+	rmi = file_info(recovery_mask_override)
+	if rmi.exists ne 1 then message, 'could not find '+recovery_mask_override
+	recmask_file = recovery_mask_override
+   end
+
+
     if n_elements(distmask_file) gt 1 then begin
 	;could be that we have second greatest disturbance, etc.
 	;first get the base nam
@@ -121,8 +130,8 @@ FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year,
      end
 
     ;if n_elements(distmask_file) ne 1 then message, 'Greatest disturbance search found this:'+distmask_file
-    if n_elements(recmask_file) ne 1 then message, 'Recovery search found this: '+recmask_file
-    
+    if n_elements(recmask_file) ne 1 then message, 'Recovery search found this: '+recmask_file else if recmask_file eq '' then message, 'no recovery mask found for '+recmask_file
+ 
 
   
   ;retrieve image info
