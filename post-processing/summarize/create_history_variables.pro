@@ -8,6 +8,7 @@ pro create_history_variables, diagfile, template_hdr, maskyes=maskyes, recovery_
 	; and nonrecovering pixels change values, all others are static. 
 
   if n_elements(maskyes) eq 0 then maskyes = 0 else maskyes = 1
+  if n_elements(recovery_mask_override) eq 0 then override = 1 else override=0	;set this up to identify output flavor
 
   for i=0, n_elements(diagfile)-1 do begin
     print, "making history variables for: ", diagfile[i]
@@ -19,7 +20,9 @@ pro create_history_variables, diagfile, template_hdr, maskyes=maskyes, recovery_
     outdir = dir+pse+"history"+pse
     if file_test(outdir) eq 0 then file_mkdir, outdir
     output_corename = outdir+pse+stringswap(file_basename(diagfile[i]), "_diag.sav", "")    
-    
+    output_corename = strcompress(output_corename + 'm'+string(maskyes)+'o'+string(override), /rem)
+
+	
     ;index = diag_info.index
     ;tsa = strsplit(file_basename(diagfile[i]),"_", /extract)
     ;tsa = tsa[3]
