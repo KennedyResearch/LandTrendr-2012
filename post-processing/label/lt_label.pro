@@ -118,7 +118,6 @@ function lt_label, run_params, subset=subset, output_path=output_path, sspan=ssp
   endelse
   
   
-  
   ;first check to make sure all of the vertyr, etc. images are there
   len = strlen(diag_file)
   endpos = strpos(diag_file, '_diag.sav')
@@ -296,10 +295,19 @@ function lt_label, run_params, subset=subset, output_path=output_path, sspan=ssp
   ;retrieve diagnosis information
   restore, diag_file
   image_info = diag_info.image_info
+
+  ;april 15, 2014. REK
+  ;   logic of extract FTV broken -- it assumes that all_years is continuous, but it was not
+  ;   to fix, we set "all_years" to be the continuous layers starting with the minimum year
+
   every_year = image_info.year
   unique_years = fast_unique(every_year)
-  all_years = unique_years[sort(unique_years)]
-  n_years = n_elements(all_years)
+  minyear = min(unique_years, max=maxyear)
+  all_years = minyear+indgen(maxyear-minyear+1)
+
+  ;old version
+  ;all_years = unique_years[sort(unique_years)]
+  ;n_years = n_elements(all_years)
   
   ; now define the chunks
   max_pixels_per_chunk = 200000l
@@ -398,7 +406,7 @@ function lt_label, run_params, subset=subset, output_path=output_path, sspan=ssp
               
               ;now extract ftv image and the corresponding magnitude.
               if extract_tc_ftv eq 'yes' then $
-                ftv_image[x,y,*] = read_segment_spectral(b_ftv[x,y,*], g_ftv[x,y,*], w_ftv[x, y, *], ok.outvals, all_years)
+             		ftv_image[x,y,*] = read_segment_spectral(b_ftv[x,y,*], g_ftv[x,y,*], w_ftv[x, y, *], ok.outvals, all_years)
             endif
           endif
         endfor
