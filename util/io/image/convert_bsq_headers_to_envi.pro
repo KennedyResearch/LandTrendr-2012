@@ -211,7 +211,7 @@ pro convert_bsq_headers_to_envi, path, template_bsq_file, overwrite=overwrite, p
         
         ;map stuff
         if strupcase(strcompress(projname, /rem)) ne '{UTM' then begin
-          printf, hdrun, 'map info = '+projname+','+startx+','+starty+','+ $
+          printf, hdrun, 'map info = '+projname+','+string(startx)+','+string(starty)+','+ $
             strcompress(string(bsqhdr.upperleftcenter[0]),/rem)+','+$   ;okay to use center because use the 1.5 for the startx and starty
             strcompress(string(bsqhdr.upperleftcenter[1]),/rem)+','+$
             strcompress(string(bsqhdr.pixelsize[0]),/rem)+','+$
@@ -219,7 +219,7 @@ pro convert_bsq_headers_to_envi, path, template_bsq_file, overwrite=overwrite, p
             datum + ','+units
           printf, hdrun, 'projection info = '+ projinfo
         end else begin ;if UTM
-          printf, hdrun, 'map info = '+strcompress(projname, /rem)+','+startx+','+starty+','+ $
+          printf, hdrun, 'map info = '+strcompress(projname, /rem)+','+string(startx)+','+string(starty)+','+ $
             strcompress(string(bsqhdr.upperleftcenter[0]),/rem)+','+$   ;okay to use center because use the 1.5 for the startx and starty
             strcompress(string(bsqhdr.upperleftcenter[1]),/rem)+','+$
             strcompress(string(bsqhdr.pixelsize[0]),/rem)+','+$
