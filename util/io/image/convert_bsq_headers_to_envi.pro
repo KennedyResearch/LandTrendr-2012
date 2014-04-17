@@ -98,12 +98,27 @@ pro convert_bsq_headers_to_envi, path, template_bsq_file, overwrite=overwrite, p
     pixsizey = pieces[6]
     zone = pieces[7]
     northsouth = pieces[8]
-    datum = pieces[9]
-    units = pieces[10]
+    if n_elements(pieces) ge 10 then datum = pieces[9] else begin
+			print, 'Error:  No datum found in template header for '+template_bsq_file
+			datum = "Unknown"
+			end
+ 
+    if n_elements(pieces) ge 11 then units = pieces[10] else units = "Unknown"
   end
-  
-  
-  
+  ;April 16, 2014.  If the user provides a template file with a startx, starty that is not
+  ;    1.5, but our internal bsq assumption is center of pixel, then this will screw things 
+  ;    up.   So, we need to force startx and starty to be 1.5, but send a warning.
+
+    if startx ne 1.5 then begin
+		print, 'Start X of '+string(startx)+' being reset to 1.5 to match zot_img standard for '+template_bsq_file
+		startx=1.5
+	end
+    if starty ne 1.5 then begin
+		print, 'Start Y of '+string(starty)+' being reset to 1.5 to match zot_img standard for '+template_bsq_file  
+     		starty=1.5
+	end
+
+ 
   ;now go through each bsq file and make the headers
   
   bsq_files = file_search(path, '*.bsq')
@@ -164,7 +179,7 @@ pro convert_bsq_headers_to_envi, path, template_bsq_file, overwrite=overwrite, p
         openw, hdrun, hdrfile, /get_lun
         printf, hdrun, 'ENVI'
         printf, hdrun, 'description = {'
-        printf, hdrun, '   File imported into ENVI.}
+        printf, hdrun, '   File imported into ENVI.}'
         printf, hdrun, 'samples = '+strcompress(string(bsqhdr.filesize[0]),/rem)
         printf, hdrun, 'lines = '+strcompress(string(bsqhdr.filesize[1]), /rem)
         printf, hdrun, 'bands = '+strcompress(string(bsqhdr.n_layers), /rem)
