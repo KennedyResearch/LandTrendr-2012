@@ -13,7 +13,61 @@ function parse_seg_params, path, ppprrr, segparamstxt, image_info_savefile, mask
   readf, lun, file_list
   free_lun, lun
   
-  ;make holders for the variables and values
+
+;evaluate whether we need to clip to a particular set of dates
+;   file_list has all of the lines.  I need to go through and see 
+;   if juldatestart or juldateend are set
+
+hits = matchstr(file_list, 'juldatestart')
+if hits[0] ne -1 then begin 	;if we found a match
+	if n_elements(hits) ne 1 then begin
+		print, 'Error: Too many juldatestart params set'
+		print, 'In:  '+segparamstxt
+		print, 'These were the values found:'
+		print, file_list[hits]
+		stop
+		endif
+
+	j=hits[0]
+	split = strsplit(file_list[j], '=', /extract)
+   juldatestart = fix(strtrim(split[1],2))	
+endif else juldatestart=180		;if not set, then just use start of eyar for later culling
+
+hits = matchstr(file_list, 'juldateend')
+if hits[0] ne -1 then begin   ;if we found a match
+   if n_elements(hits) ne 1 then begin
+      print, 'Error: Too many juldatend params set'
+      print, 'In:  '+segparamstxt
+      print, 'These were the values found:'
+      print, file_list[hits]
+      stop
+      endif
+
+   j=hits[0]
+   split = strsplit(file_list[j], '=', /extract)
+   juldateend = fix(strtrim(split[1],2))
+endif else juldateend=270  ;if not set, then just use end of year for later culling
+
+;now go through and trim all of the image info and cull
+	these=where(image_info.julday ge juldatestart and image_info.julday le juldateend, n_goods)
+	if n_goods eq 0 then begin
+		print, 'Error:  juldatestart and juldateend result in no good images!'
+		print, 'Juldatestart: '+string(juldatestart)
+		print, 'Juldateend: '+string(juldateend)
+		stop
+	end
+
+	image_info= image_info[these]	;subset to the appropriate dates! 
+	
+
+
+
+
+
+
+
+
+ ;make holders for the variables and values
   variable = strarr(n_elements(file_list))
   value = strarr(n_elements(file_list))
   
@@ -34,7 +88,9 @@ function parse_seg_params, path, ppprrr, segparamstxt, image_info_savefile, mask
     vertexcountovershoot: 3s ,$
     bestmodelproportion: 0.0 ,$
     mask_image: '' ,$
-    subset: [[0.0D,0.0D],[0.0D,0.0D]] ,$
+    juldatestart: 180, $
+	 juldateend: 270, $
+	 subset: [[0.0D,0.0D],[0.0D,0.0D]] ,$
     output_base: '',$
     output_path: "", $	;added REK march 28 2013
     image_info:image_info}
@@ -47,6 +103,17 @@ function parse_seg_params, path, ppprrr, segparamstxt, image_info_savefile, mask
     value[j] = strtrim(split[1],2)
     if firsttime eq 1 then begin
       n_runs = n_elements(strsplit(value[j], ',', /extract))
+		if n_runs ne 1 then begin
+			print,"Error in parse_seg_params:  Only one set of parameters is currently allowed."
+			print,"In this parameter file: "+segparamstxt
+			print,"There were more than set of run params."
+			print,"Here is what was found on the first line that indicates more than one set of runs:"
+			print,value[j]
+			print,"Please fix this in the parameter file and retry."
+			stop
+
+	end
+
       theruns = replicate(theruns, n_runs)
       ulx = strarr(n_runs)
       uly = strarr(n_runs)
@@ -84,7 +151,8 @@ function parse_seg_params, path, ppprrr, segparamstxt, image_info_savefile, mask
       if variable[j] eq 'distweightfactor' then theruns[i].distweightfactor = fix(splitup[i])
       if variable[j] eq 'vertexcountovershoot' then theruns[i].vertexcountovershoot = fix(splitup[i])
       if variable[j] eq 'bestmodelproportion' then theruns[i].bestmodelproportion = float(splitup[i])
-      
+      if variable[j] eq 'juldate_start' then theruns[i].juldatestart=fix(splitup[i])
+		if variable[j] eq 'juldate_end' then theruns[i].juldateend=fix(splitup[i])
       if variable[j] eq 'run_name' then if splitup[i] ne 'na' then theruns[i].run_name = splitup[i]+"_" else theruns[i].run_name = ""
       
       ;deal with the mask_image_keyword
