@@ -217,14 +217,14 @@ function find_landtrendr_files, path
     endcase
     
     juldays[i] = fix(strmid(image_files[i],slash+juldayoffset, 3))
-    if juldays[i] lt 150 or juldays[i] gt 270 then begin
-      test1 = fix(strmid(image_files[i],slash+juldayoffset-1, 3))
-      test2 = fix(strmid(image_files[i],slash+juldayoffset+1, 3))
+    ;if juldays[i] lt 150 or juldays[i] gt 270 then begin
+    ;  test1 = fix(strmid(image_files[i],slash+juldayoffset-1, 3))
+   ;   test2 = fix(strmid(image_files[i],slash+juldayoffset+1, 3))
       
-      if test1 lt 270 and test1 gt 180 then juldays[i] = test1 else $
-        if test2 lt 270 and test2 gt 180 then juldays[i] = test2 else $
-        message, 'Find_landtrendr_files:  cannot find a valid julian day for '+image_files[i]
-    end
+    ;  if test1 lt 360 and test1 gt 0 then juldays[i] = test1 else $
+    ;    if test2 lt 360 and test2 gt 0 then juldays[i] = test2 else $
+    ;    message, 'Find_landtrendr_files:  cannot find a valid julian day for '+image_files[i]
+    ;end
     
     case 1 of
       (type[i] eq 1):   core = strmid(image_files[i],0, len-8)		;  assumes "_REFL.img" is the tail

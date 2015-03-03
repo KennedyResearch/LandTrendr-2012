@@ -86,7 +86,7 @@ pro madcal_pixel_picker, path, this_run_info, image_info, param_set=param_set, m
   
   ;---combine the masks---
   print, "creating a mask"
-  
+ stop 
   ;make a 0/1 raster from the dependent file cloudmask
   subset=mastersubset
   zot_img, maskdep, maskdep_hdr, maskdep_img, subset=subset

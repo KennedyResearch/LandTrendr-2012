@@ -74,7 +74,7 @@ function apply_fitted_trajectory_v1, all_years, goods, vvals,  $
   all_x = all_years - minimum_x_year
   fixed_v = vertices-minimum_x_year
 
-
+  
 
    													  ;avoid little dribs and drabs
 
@@ -96,6 +96,13 @@ n_yrs = n_elements(vvals)   ;how many years are to be used in this fitting (i.e.
   ;  vals = vals * modifier  ;this sets everything so disturbance is always positive
 
 max_count = n_elements(fixed_v)	;just need this to set segment_mse
+
+;dumb fix
+
+  ; if fixed_v[max_count-1] lt fixed_v[max_count-2] then fixed_v[max_count-2:max_count-1] = [fixed_v[max_count-1], fixed_v[max_count-2]]
+  fixed_v = fixed_v[sort(fixed_v)]
+
+
 
 
 ;set up blank
@@ -134,6 +141,7 @@ max_count = n_elements(fixed_v)	;just need this to set segment_mse
 ;Use the fixed vertices to find the best route
 ; through these vals
 
+;if fixed_v[max_count-1]  fixed_v[max_count-2] then stop
 
 	fitted = ftv_v1(all_x, goods, vals,fixed_v)	;max_count is the number of segments + 1
 

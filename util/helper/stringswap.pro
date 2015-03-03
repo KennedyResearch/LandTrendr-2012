@@ -48,6 +48,7 @@ outstring = strarr(n)
 
 
  rlen = strlen(regexp)
+ swlen =strlen(swapto)
 
 for i = 0, n-1 do begin
     stlen = strlen(usestring[i])
@@ -64,8 +65,11 @@ for i = 0, n-1 do begin
   ;avoid endless recursion
 
     if regexp ne swapto then begin 
-     a = strpos(outstring[i], regexp)
-     if a ne -1 then outstring[i] = stringswap(outstring[i], regexp, swapto)
+     a1 = strpos(outstring[i], regexp)
+     if a1 gt (a+swlen) then begin	;check to see if it's past the end of the added section
+	stringtemp = strmid(outstring[i],a+swlen, strlen(outstring[i])-(a+swlen)+1)	;if so, just grab this latter part to swap
+	outstring[i] = strmid(outstring[i], 0, a+swlen)+stringswap(stringtemp, regexp, swapto)	;construct the new from parts
+     end
     end
 end ;i
 

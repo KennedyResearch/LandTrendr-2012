@@ -84,7 +84,7 @@ function run_tbcd_single_chunk, info,  $
 	n_images = n_elements(info)	;because we need to go through each image, even if multiple per year
 
 	if n_yrs lt minimum_number_years_needed then begin
-		print, 'run_tbcd_single_chunk:  there are fewer than the minimum
+		print, 'run_tbcd_single_chunk:  there are fewer than the minimum'
 		print, 'number of years available for disturbance/recovery extraction'
 		print, 'the minimum is: '+string(minimum_number_years_needed)
 		print, 'the number of files given to extract_disturbance_recovery4.pro: '+string(n_yrs)

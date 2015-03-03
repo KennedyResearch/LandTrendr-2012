@@ -117,6 +117,21 @@ function evaluate_classes_rule, interpd_class_codes, yr_traj, vv_traj, mag_traj,
   endif
   command = 'precov_traj = fix(' + static_model + '(vv_traj))'
   ok = execute(command)
+  
+  ;jamie, uncomment this when running the band 5 test
+  ;if vv_traj[0] ne 0 then stop
+  
+  ;when execution stops in the IDL command line interface, 
+  ;   see what the variable values are.   To do that:
+  ;IDL>   print, vv_traj
+  ;IDL>    print, precov_traj
+  ; our goal is to have the precov_traj be 0 < precov_traj < 100
+  ;  The key unknown here is whether the vv_traj for band5
+  ;    is negative or positive.  So it's possible that the 
+  ;     function we create from teh regression is flipped, 
+  ;    in which case the pre_cov
+  
+  
   precov_traj = precov_traj * (dur_traj gt 0)
   
 
