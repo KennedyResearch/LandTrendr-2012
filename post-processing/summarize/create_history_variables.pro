@@ -16,11 +16,12 @@ pro create_history_variables, diagfile, template_hdr, maskyes=maskyes, recovery_
     years = diag_info.image_info.year
     start_year = min(years)
     end_year = max(years)
+    maskname_append=strcompress('m'+string(maskyes)+'o'+string(override), /rem)
     dir = file_dirname(diagfile)
-    outdir = dir+pse+"history"+pse
+    outdir = dir+pse+"history_"+maskname_append+pse
     if file_test(outdir) eq 0 then file_mkdir, outdir
     output_corename = outdir+pse+stringswap(file_basename(diagfile[i]), "_diag.sav", "")    
-    output_corename = strcompress(output_corename + 'm'+string(maskyes)+'o'+string(override), /rem)
+    output_corename = strcompress(output_corename + maskname_append, /rem)
 
 	
     ;index = diag_info.index

@@ -85,6 +85,9 @@ pro zot_img_envi, file, output_header, output_image, layers=layers, $
 			 			print, 'zot_img_envi:  error -- coordinates outside of image'
 			 			print, 'failing read'
 
+						print, 'image: '+file
+						print, 'Proposed coordinates: '+string(subs)
+						print, 'Bounds: '+string(bounds)
 
 			 			goto, past
 			 			end
@@ -176,11 +179,12 @@ for l = 0, n_elements(layers)-1 do begin
   		end
 
 
-  layeroffset = (ulong(layersize)*(layers(l)-1))
+  layeroffset = (ulong64(layersize)*(layers(l)-1))
+
 
 
   for i = 0l, sub_size(1)-1 do begin
-    point_lun, un, (offset_pixels*mult)+(ulong(fsize(0))*mult*i)+layeroffset
+    point_lun, un, (offset_pixels*mult)+(ulong64(fsize(0))*mult*i)+layeroffset
     readu, un, line
     image(*,i, l)=line
   end

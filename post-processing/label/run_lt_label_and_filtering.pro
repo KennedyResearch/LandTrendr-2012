@@ -15,6 +15,8 @@ pro run_lt_label_and_filtering, diag_files, label_parameters_txt, class_code_txt
     label_params = parse_label_params(path, diag_files[i], label_parameters_txt[i], class_code_txt, eval=eval)
    
     checkit = label_existence_check(path, diag_files[i], label_params)
+    
+    print, "starting lt_label"
     if checkit.ok eq 0 then continue
     ok = lt_label(checkit.updated_label_params)
     if ok.ok eq 0 then message, ok.message

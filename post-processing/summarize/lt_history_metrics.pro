@@ -108,18 +108,20 @@ FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year,
     diagdir = file_dirname(diag_file)+path_sep()
     diagbase = file_basename(diag_file)
     basename = strmid(diagbase, 0, strlen(diagbase)-9)
-    distmask_file = file_search(diagdir, basename + '*greatest_disturbance*loose.bsq')
-    recmask_file = file_search(diagdir, basename + '*greatest_recovery*loose.bsq')
+   if maskyes eq 1 then begin
 
-  ;it's possible the user wants to override with a special recovery layer
-   if n_elements(recovery_mask_override) ne 0 then begin
+     distmask_file = file_search(diagdir, basename + '*greatest_disturbance*loose.bsq')
+     recmask_file = file_search(diagdir, basename + '*greatest_recovery*loose.bsq')
+
+      ;it's possible the user wants to override with a special recovery layer
+     if n_elements(recovery_mask_override) ne 0 then begin
 	rmi = file_info(recovery_mask_override)
 	if rmi.exists ne 1 then message, 'could not find '+recovery_mask_override
 	recmask_file = recovery_mask_override
-   end
+     end
 
 
-    if n_elements(distmask_file) gt 1 then begin
+      if n_elements(distmask_file) gt 1 then begin
 	;could be that we have second greatest disturbance, etc.
 	;first get the base nam
 	base=file_basename(distmask_file)
@@ -127,11 +129,19 @@ FUNCTION lt_history_metrics, diagfile, end_year=end_year, start_year=start_year,
 	;find the shortest one.  then see if the other has the same timetamp
 	mp = min(ap)
 	distmask_file = distmask_file[where(ap eq mp)]
-     end
+	if n_elements(distmask_file) gt 1 then begin
+	  ;could be that files are same name but different directories - Jamie
+	  distmask_file = distmask_file[0]
+	end
+	  
+      end
+      
+      ;stop - Jamie
 
     ;if n_elements(distmask_file) ne 1 then message, 'Greatest disturbance search found this:'+distmask_file
-    if n_elements(recmask_file) ne 1 then message, 'Recovery search found this: '+recmask_file else if recmask_file eq '' then message, 'no recovery mask found for '+recmask_file
- 
+      if n_elements(recmask_file) ne 1 then message, 'Recovery search found this: '+recmask_file else if recmask_file eq '' then message, 'no recovery mask found for '+recmask_file
+
+    end else distmask_file=(recmask_file="");  if masking is set.  
 
   
   ;retrieve image info
@@ -278,7 +288,6 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
   
   for current_chunk = 0, n_chunks-1 do begin
     print, 'Processing chunk ' + string(current_chunk) + ' of ' + string(n_chunks) + ' chunks'
-    
     this_subset =  chunks[current_chunk].coords
     within_layer_offset = chunks[current_chunk].within_layer_offset * 2
     ;read in segmse and fitted file
@@ -302,11 +311,12 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
 
 
     ;read the two mask files ;; added march 2013. REK
-    this_subset =  chunks[current_chunk].coords
-    zot_img, distmask_file, dm_hdr, distmask, subset=this_subset, layers=[1]	;open the year of onset layer;  if zero in a pixel, then nothing happened
-    this_subset =  chunks[current_chunk].coords
-    zot_img, recmask_file, rm_hdr, recmask, subset=this_subset, layers=[1]	;same as prior
-    
+     if maskyes then begin
+	  this_subset =  chunks[current_chunk].coords
+    	zot_img, distmask_file, dm_hdr, distmask, subset=this_subset, layers=[1]	;open the year of onset layer;  if zero in a pixel, then nothing happened
+    	this_subset =  chunks[current_chunk].coords
+    	zot_img, recmask_file, rm_hdr, recmask, subset=this_subset, layers=[1]	;same as prior
+    end    
     
     xsize = hdr.filesize[0]
     ysize = hdr.filesize[1]
@@ -401,7 +411,8 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
   
     ;set up params for metadata
     date = systime()
-  
+
+ 
     ;b_t
     this_file = core_name + output_image_group[0]
     openu, un, this_file, /get_lun
@@ -411,14 +422,22 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
     end
     free_lun, un
      outmeta = stringswap(this_file, 'bsq', 'meta.txt')
-     metadata={parent_file1: ftv_tcb_file, $
+
+if maskyes then begin
+      metadata={parent_file1: ftv_tcb_file, $
       parent_file2: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
- if file_test(outmeta) eq 0 then $
-     concatenate_metadata, [distmask_file, recmask_file, ftv_tcb_file, vv_file, vy_file],outmeta,params=metadata
-     
+    if file_test(outmeta) eq 0 then $
+	 concatenate_metadata, [distmask_file, recmask_file, ftv_tcb_file, vv_file, vy_file],outmeta,params=metadata
+end else begin 
+       metadata={parent_file1: ftv_tcb_file, $
+      parent_file2: vv_file, $
+      creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [ftv_tcb_file, vv_file, vy_file],outmeta,params=metadata
+end
 
 
     ;g_t
@@ -430,13 +449,22 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
     end
     free_lun, un
   outmeta = stringswap(this_file, 'bsq', 'meta.txt')
+
+if maskyes then begin
       metadata={parent_file1: ftv_tcg_file, $
       parent_file2: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
- if file_test(outmeta) eq 0 then $
-     concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_file],outmeta,params=metadata
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_file],outmeta,params=metadata
+end else begin
+       metadata={parent_file1: ftv_tcg_file, $
+      parent_file2: vv_file, $
+      creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [ftv_tcg_file, vv_file, vy_file],outmeta,params=metadata
+end
 
 
   
@@ -449,14 +477,25 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
     end
     free_lun, un
       outmeta = stringswap(this_file, 'bsq', 'meta.txt')
-  metadata={parent_file1: ftv_tcw_file, $
+ 
+ if maskyes then begin
+      metadata={parent_file1: ftv_tcw_file, $
       parent_file2: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
- if file_test(outmeta) eq 0 then $
-     concatenate_metadata, [distmask_file, recmask_file, ftv_tcw_file, vv_file, vy_file],outmeta,params=metadata
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [distmask_file, recmask_file, ftv_tcw_file, vv_file, vy_file],outmeta,params=metadata
+end else begin
+       metadata={parent_file1: ftv_tcw_file, $
+      parent_file2: vv_file, $
+      creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [ftv_tcw_file, vv_file, vy_file],outmeta,params=metadata
+end
 
+ 
+ 
    ;n_t
     this_file = core_name + output_image_group[7]
     openu, un, this_file, /get_lun
@@ -466,13 +505,22 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
     end
     free_lun, un
       outmeta = stringswap(this_file, 'bsq', 'meta.txt')
-  metadata={parent_file1: ftv_nbr_file, $
+ if maskyes then begin
+      metadata={parent_file1: ftv_nbr_file, $
       parent_file2: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
- if file_test(outmeta) eq 0 then $
-     concatenate_metadata, [distmask_file, recmask_file, ftv_nbr_file, vv_file, vy_file],outmeta,params=metadata
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [distmask_file, recmask_file, ftv_nbr_file, vv_file, vy_file],outmeta,params=metadata
+end else begin
+       metadata={parent_file1: ftv_nbr_file, $
+      parent_file2: vv_file, $
+      creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [ftv_nbr_file, vv_file, vy_file],outmeta,params=metadata
+end
+
 
 
 
@@ -485,16 +533,24 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
     end
     free_lun, un
   outmeta = stringswap(this_file, 'bsq', 'meta.txt')
-  metadata={parent_file1: ftv_tcb_file, $
+ 
+ if maskyes then begin
+      metadata={parent_file1: ftv_tcb_file, $
       parent_file2: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
- if file_test(outmeta) eq 0 then $
-     concatenate_metadata, [distmask_file, recmask_file, ftv_tcb_file, vv_file, vy_file],outmeta,params=metadata
+    if file_test(outmeta) eq 0 then $
+	 concatenate_metadata, [distmask_file, recmask_file, ftv_tcb_file, vv_file, vy_file],outmeta,params=metadata
+end else begin 
+       metadata={parent_file1: ftv_tcb_file, $
+      parent_file2: vv_file, $
+      creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [ftv_tcb_file, vv_file, vy_file],outmeta,params=metadata
+end
 
-
-  
+   
     ;dg_t
     this_file = core_name + output_image_group[4]
     openu, un, this_file, /get_lun
@@ -504,13 +560,21 @@ if current_chunk eq n_chunks then return, {ok:1, hist_info:hist_info, msg:'Alrea
     end
     free_lun, un
   outmeta = stringswap(this_file, 'bsq', 'meta.txt')
-  metadata={parent_file1: ftv_tcg_file, $
+ if maskyes then begin
+      metadata={parent_file1: ftv_tcg_file, $
       parent_file2: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
- if file_test(outmeta) eq 0 then $
-concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_file],outmeta,params=metadata
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_file],outmeta,params=metadata
+end else begin
+       metadata={parent_file1: ftv_tcg_file, $
+      parent_file2: vv_file, $
+      creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [ftv_tcg_file, vv_file, vy_file],outmeta,params=metadata
+end
 
   
     ;dw_t
@@ -522,13 +586,25 @@ concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_fi
     end
     free_lun, un
   outmeta = stringswap(this_file, 'bsq', 'meta.txt')
-  metadata={parent_file1: ftv_tcw_file, $
+  
+ if maskyes then begin
+      metadata={parent_file1: ftv_tcw_file, $
       parent_file2: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
- if file_test(outmeta) eq 0 then $
-     concatenate_metadata, [distmask_file, recmask_file, ftv_tcw_file, vv_file, vy_file],outmeta,params=metadata
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [distmask_file, recmask_file, ftv_tcw_file, vv_file, vy_file],outmeta,params=metadata
+end else begin
+       metadata={parent_file1: ftv_tcw_file, $
+      parent_file2: vv_file, $
+      creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [ftv_tcw_file, vv_file, vy_file],outmeta,params=metadata
+end
+
+
+
 
   ;dn_t
     this_file = core_name + output_image_group[8]
@@ -539,14 +615,21 @@ concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_fi
     end
     free_lun, un
       outmeta = stringswap(this_file, 'bsq', 'meta.txt')
-  metadata={parent_file1: ftv_nbr_file, $
+ if maskyes then begin
+      metadata={parent_file1: ftv_nbr_file, $
       parent_file2: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
- if file_test(outmeta) eq 0 then $
-     concatenate_metadata, [distmask_file, recmask_file, ftv_nbr_file, vv_file, vy_file],outmeta,params=metadata
-
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [distmask_file, recmask_file, ftv_nbr_file, vv_file, vy_file],outmeta,params=metadata
+end else begin
+       metadata={parent_file1: ftv_nbr_file, $
+      parent_file2: vv_file, $
+      creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [ftv_nbr_file, vv_file, vy_file],outmeta,params=metadata
+end
 
 
 
@@ -559,16 +642,22 @@ concatenate_metadata, [distmask_file, recmask_file, ftv_tcg_file, vv_file, vy_fi
     end
     free_lun, un
   outmeta = stringswap(this_file, 'bsq', 'meta.txt')
-  metadata={parent_file1: vv_file,  $
+ 
+ if maskyes then begin
+      metadata={parent_file1: vv_file, $
       masking_file1: distmask_file, $
       masking_file2:recmask_file, $
       creationdate: date}
-   if file_test(outmeta) eq 0 then $
-     concatenate_metadata, [distmask_file, recmask_file, vv_file, vy_file],outmeta,params=metadata
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [distmask_file, recmask_file, vv_file, vy_file],outmeta,params=metadata
+end else begin
+       metadata={parent_file1: vv_file, $
+       creationdate: date}
+    if file_test(outmeta) eq 0 then $
+         concatenate_metadata, [vv_file, vy_file],outmeta,params=metadata
+end
 
 
-
- 
     ;rv_b
     ;this_file = core_name + output_image_group[6]
     ;openu, un, this_file, /get_lun

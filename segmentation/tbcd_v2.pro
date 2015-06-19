@@ -498,6 +498,7 @@ function find_best_trace, x, y, v, n_segments
 		yfit_final[v[s]:v[s+1]] 	= yfit_better
 
 		for s = 1, n_segments-1 do begin
+		 
 		  dotway = fill_line(x, vx[s:s+1], vv[s:s+1], slope=dot_slope)
 			anch = anchored_regression(x[v[s]:v[s+1]], y[v[s]:v[s+1]], vv[s] )
 		  anchway=anch.yfit

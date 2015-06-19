@@ -1,4 +1,4 @@
-static_model         = mr_224_static_nbr_cover_model
+static_model         = static_nbr_model_pilot_scenes
 change_model         = none
 pct_tree_loss1       = 10
 pct_tree_loss20      = 3

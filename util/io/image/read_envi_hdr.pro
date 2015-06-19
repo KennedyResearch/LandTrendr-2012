@@ -142,7 +142,7 @@ pro read_envi_hdr, filename, bands, size, bytetype, coords, pixsize, $
     case proj of
       ('UTM'):   begin
         zone = fix(pieces[7])
-        datum = pieces[9]
+        if n_elements(pieces) ge 10  then datum = pieces[9] else print, 'Warning: No datum found in UTM header for '+filename
         north = strcompress(pieces[8],/rem) eq 'North'
       end
 
@@ -160,10 +160,10 @@ pro read_envi_hdr, filename, bands, size, bytetype, coords, pixsize, $
       end
 	('USGS Landsat Albers'): datum = pieces[7]
 	('albers_landsat'): datum = pieces[7]
+	('Albers_Conic_Equal_Area'): datum = pieces[7]
 
 
-
-      else:   stop
+      else:   datum = pieces[7]
 
     endcase
 

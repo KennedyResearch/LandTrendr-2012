@@ -31,9 +31,9 @@ pro check_image_info_prior_to_seg, image_info_savefile, ledaps=ledaps
         yearday = strcompress(string(checkit[i].year)+"_"+string(checkit[i].day)+": ", /rem)
         print, ""
         print, ">>> !!!warning!!! image date: ",yearday
-        print, ">>> does not have a cloudmask, please fix this and rerun segmentation"
+        print, ">>> does not have a cloudmask";, please fix this and rerun segmentation"
         print, ""
-        bad = bad+1
+        ;bad = bad+1
       endif
     endfor
     
@@ -95,7 +95,7 @@ pro check_image_info_prior_to_seg, image_info_savefile, ledaps=ledaps
           print, ""
           print, ">>> !!!warning!!! there is nometadata for this radref or normalized image date: "
           print, yearday
-          print, "fix this and rerun segmentation
+          print, "fix this and rerun segmentation"
           print, ""
         endelse
       endelse

@@ -120,7 +120,7 @@ function madcal_for_tbcd_auto, image_info, run_params, output_csv_file, $
     if image_info[run].type eq 3 then goto, skip
     ;move on if this is file does not have a cloudmask
     if image_info[run].cloud_file eq "none" then begin
-      print, "  >>> this image does not have a cloudmask, skipping...
+      print, "  >>> this image does not have a cloudmask, skipping..."
       goto, skip1
     endif
     ;check to see if a normalized file already exists, if so and this is not a fix, then skip running madcal on the date

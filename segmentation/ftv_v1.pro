@@ -131,14 +131,17 @@ if n_segments eq 0 then begin		;this is an error catch -- need to see why some v
 				yfit:fix(replicate(mny, n_obs))}
 	;v = [x[0], x[n_obs-1]]
 	v = [0, n_all_x-1]		;changed 3/26/08
+	segment_mse = [0]
 
 ;TODO <YANG> why v is not the same size as yfit
 
-end else  best_fit = find_best_trace(x, y, v, n_segments)	;NOTE THAT N_VERTICES IS DIFFERENT THAN CALL TO FIND_BEST_TRACE (THE OLDER VERSION)
+end else begin
+  ;if v[n_vertices-1] < v[n_vertices-2] then stop
 
-;get the mse
-
-segment_mse = sqrt(score_segments(x,y,v, n_segments+1))
+  best_fit = find_best_trace(x, y, v, n_segments)	;NOTE THAT N_VERTICES IS DIFFERENT THAN CALL TO FIND_BEST_TRACE (THE OLDER VERSION)
+ ;get the mse
+ segment_mse = sqrt(score_segments(x,y,v, n_segments+1))
+end
 
 ;the v is based on the goods index, not the all_x index, so
 ;   if there is a cloud year in the middleof the sequence,

@@ -22,7 +22,7 @@ pro create_image_info, path, filename, useareafile=useareafile
       print, ">>> since a useareafile was not passed..."
       print, ">>> trying to find a '*vct_usearea.bsq' file here:"
       print, "  ", path+"study_area"+pse
-      print, ">>> but apparently there are more than 1...
+      print, ">>> but apparently there are more than 1..."
       print, ">>> it can't be this way, delete extras"
       stop
     endif

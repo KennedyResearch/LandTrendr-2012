@@ -48,12 +48,14 @@ function getxy, whereval, xdim, ydim
 on_error, 2
 
 n_pts = n_elements(whereval)
-offset= fltarr(n_pts)
+offset= lonarr(n_pts) 	;changed to long from float 1/26/14 REK
 
 pos=lonarr(2, n_pts)	;0 = x, 1 = y   ;changed to lonarr 2/25/06
 
 pos(1,*)= long(whereval(*) / xdim)	;ydimension
-offset(*)= pos(1,*) * xdim
+offset(*)= pos(1,*) * long(xdim)	;added long() to xdim 1/26/14 REK
 pos(0,*)= whereval(*)-offset		;xdimension
+
+
 return, pos
 end

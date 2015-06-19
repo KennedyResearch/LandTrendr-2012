@@ -225,6 +225,41 @@ case 1 of
 						modifier = -1
 					  end
 
+(tempindex eq 'SAVI'):   begin
+                                        if (file_exists(image_info.image_file) eq 0) then message, image_info.image_file + 'does not exist'
+                                                zot_img, image_info.image_file, hdr, img1, subset=subset, layer = [4]
+                                            img1 = fix(img1)
+            subset = mastersubset
+                                                zot_img, image_info.image_file, hdr, img2, subset=subset, layer = [3]
+
+                                                background_pixels = where(img1 eq background_val, nbg)
+                                                img2 = fix(img2)
+
+                                                img = img1
+                                                goods = where(img1+img2 ne 0, ngoods)
+
+                                                if ngoods gt 0 then begin
+                                                        diff = float(img1[goods]-img2[goods])
+                                                        sum = (img1[goods]+img2[goods]+5000)	;assumes using ledaps-scaled reflectance
+
+                                                        img1=0
+                                                        img2=0
+                                                        savi = 1.5*(diff/sum)
+                                                        diff=0
+                                                        sum=0
+
+                                                        img[goods] = 1000*savi
+                                                end
+
+                                                if nbg ne 0 then img[background_pixels] = background_val                ;reset background val
+
+                                                modifier = -1
+                                          end
+
+
+
+
+
  (tempindex eq 'BIOMASS'):  begin
  						if (file_exists(image_info.image_file) eq 0) then message, image_info.image_file + 'does not exist'
 						zot_img, image_info.image_file, hdr, img, subset=subset, layer = [1]
@@ -236,6 +271,33 @@ case 1 of
 						zot_img, image_info.image_file, hdr, img, subset=subset, layer = [1]
 						modifier = -1
 						end
+
+
+(tempindex eq 'LTURBAN'): begin
+                                                if (file_exists(image_info.tc_file) eq 0) then message, image_info.image_file + 'does not exist'
+                                                subset=mastersubset
+                                                zot_img, image_info.tc_file, hdr, img1, subset=subset, layer = [1]       ;brt
+                                                subset = mastersubset
+                                                zot_img, image_info.tc_file, hdr, img2, subset=subset, layer = [2]  ;grn
+                                                subset=mastersubset
+                                                zot_img, image_info.tc_file, hdr, img3, subset=subset, layer =[3]       ;wet
+
+
+
+                                                background_pixels = where(img1 eq background_val, nbg)
+                                                img = fix(img1)
+                                                goods = where(img1 ne 0, ngoods)
+
+                                                if (ngoods gt 0) then img[goods] =   alog10(sqrt(  (img1[goods]-3640)^2+ $
+											    (img2[goods]-79.4)^2+ $
+											    (img3[goods]+1142)^2))
+
+                                                if nbg ne 0 then img[background_pixels] = background_val                ;reset background val
+
+                                                modifier = -1
+                                end
+ 
+
 
 
 

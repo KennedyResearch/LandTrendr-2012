@@ -42,7 +42,7 @@ function process_ftv_chunks, ftv_run_params, progressbaryesno, interpolate=inter
   
   apply_to_image_info = ftv_run_params.apply_to_image_info
   apply_to_index = ftv_run_params.apply_to_index				;string with name of apply_to_index
-  subset=ftv_run_params.subset
+ subset=ftv_run_params.subset
   mask_image = ftv_run_params.mask_image
   output_base = ftv_run_params.output_base
   kernelsize = ftv_run_params.kernelsize
@@ -123,7 +123,8 @@ function process_ftv_chunks, ftv_run_params, progressbaryesno, interpolate=inter
     
     ;zot_img, apply_to_image_info[0].image_file, hdr, img, subset=subset, /hdronly
     ;pixsize = hdr.pixelsize
-    zot_img, vertex_image_file, hdr, img, subset=subset, /hdronly
+
+   zot_img, vertex_image_file, hdr, img, subset=subset, /hdronly
     pixsize = hdr.pixelsize
     max_segments = hdr.n_layers-1
     
@@ -306,7 +307,7 @@ function process_ftv_chunks, ftv_run_params, progressbaryesno, interpolate=inter
   ;  for file units, need to multiply by 2 because 2 bytes per pixel
   ;  in integer world.
   within_layer_offset = chunks[current_chunk].within_layer_offset * 2
-   
+ ; stop 
     ok = run_ftv_single_chunk(vertex_image_file, apply_to_image_info, $
     subset, apply_to_index, mask_image, output_image_group, $
     within_layer_offset, layersize, kernelsize, $
